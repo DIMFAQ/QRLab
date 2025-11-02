@@ -1,35 +1,30 @@
 <?php
+
 namespace App\Models;
 
-use Laravel\Sanctum\HasApiTokens; // WAJIB ADA
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail // <- penting
 {
-    // WAJIB ADA HasApiTokens DI SINI
-    use HasApiTokens, HasFactory, Notifiable; 
+    use HasApiTokens, Notifiable;
 
     protected $fillable = [
-        'name', 'email', 'password', 'role', 'member_id',
+        'email','password','role','member_id',
     ];
 
-    protected $hidden = [
-        'password', 'remember_token',
+    protected $hidden = ['password', 'remember_token'];
+
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
     ];
 
-    protected function casts(): array
+    // relasi ke member (nama & npm disimpan di members)
+    public function member()
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
-    }
-    
-    public function member() 
-    {
-        // Relasi ini harus ada untuk $user->load('member')
-        return $this->belongsTo(Member::class);
+        return $this->belongsTo(\App\Models\Member::class, 'member_id');
     }
 }

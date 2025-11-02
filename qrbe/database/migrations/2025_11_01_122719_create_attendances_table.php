@@ -9,6 +9,7 @@ return new class extends Migration
     {
         Schema::create('attendances', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('meeting_id')->nullable()->constrained()->cascadeOnDelete(); // BARU: Tambahkan meeting_id
             $table->foreignId('member_id')->constrained('members')->cascadeOnDelete();
             $table->timestamp('checked_in_at');
             $table->timestamps();
