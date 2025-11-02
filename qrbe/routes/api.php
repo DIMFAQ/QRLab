@@ -7,7 +7,10 @@ use App\Http\Controllers\API\MeetingController;
 use App\Http\Controllers\API\PraktikanController;
 
 // RUTE PUBLIK (Login)
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login',    [AuthController::class, 'login']);
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/reset-password',  [AuthController::class, 'resetPassword']);
 
 // RUTE TERPROTEKSI (Auth: Sanctum)
 Route::middleware('auth:sanctum')->group(function () {
@@ -15,6 +18,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/praktikan/me', [PraktikanController::class, 'update']);
     Route::get('/praktikan/riwayat', [PraktikanController::class, 'riwayat']);
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verify'])
+        ->middleware(['signed', 'throttle:6,1'])
+        ->name('verification.verify');
+
+    Route::post('/email/verification-notification', [AuthController::class, 'resendVerification'])
+        ->middleware('throttle:6,1')
+        ->name('verification.send');
 
     // Rute Praktikan: Absensi
     Route::post('/attendance/checkin-qr', [AttendanceController::class, 'checkin']);

@@ -6,13 +6,14 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Notifications\ResetPasswordNotification;
 
 class User extends Authenticatable implements MustVerifyEmail // <- penting
 {
     use HasApiTokens, Notifiable;
 
     protected $fillable = [
-        'email','password','role','member_id',
+        'name', 'email', 'password', 'role', 'member_id',
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -26,5 +27,9 @@ class User extends Authenticatable implements MustVerifyEmail // <- penting
     public function member()
     {
         return $this->belongsTo(\App\Models\Member::class, 'member_id');
+    }
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new ResetPasswordNotification($token));
     }
 }

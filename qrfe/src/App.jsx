@@ -5,6 +5,9 @@ import Login from './components/login';
 import AdminMeetings from './components/AdminMeetings';
 import QrScannerComponent from './components/QrScanner';
 import PraktikanDashboard from './pages/PraktikanDashboard';
+import Register from './components/Register';
+import ForgotPassword from './components/ForgotPassword';
+import ResetPassword from './components/ResetPassword';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -87,7 +90,9 @@ export default function App() {
               )
             }
           />
-
+        <Route path="/register" element={user ? <Navigate to={isAdmin ? "/admin" : "/praktikan"} /> : <Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
           {/* Admin */}
           <Route
             path="/admin"
