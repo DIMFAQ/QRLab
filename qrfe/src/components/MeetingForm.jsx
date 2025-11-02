@@ -20,8 +20,22 @@ export default function MeetingForm({ onMeetingCreated, activeQr }) {
     if (activeQr) return alert('Tutup dulu sesi yang sedang aktif.');
     setLoading(true);
     setError('');
+
+    // --- BAGIAN INI YANG DIPERBAIKI ---
+    const payload = {
+      name: formData.name,
+      // WAJIB dikonversi ke Number agar sesuai dengan payload yang diinginkan
+      meeting_number: Number(formData.meeting_number), 
+      qr_duration_minutes: Number(formData.qr_duration_minutes),
+      // start_time & end_time sudah dijamin formatnya "YYYY-MM-DDTHH:mm" dari useState
+      start_time: formData.start_time,
+      end_time: formData.end_time,
+    };
+    // ------------------------------------
+
     try {
-      const { data } = await api.post('/admin/meetings', formData);
+      // Mengirim payload yang sudah diformat
+      const { data } = await api.post('/admin/meetings', payload); 
       onMeetingCreated?.(data);
     } catch (err) {
       setError(err?.response?.data?.message || 'Gagal membuat pertemuan.');

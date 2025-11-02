@@ -1,131 +1,103 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
+import { Scanner } from '@yudiel/react-qr-scanner';
 import api from '../api';
 
-// === Gunakan salah satu scanner ===
-// A) react-qr-scanner (punya onScan/onError)
-import QrScanner from 'react-qr-scanner';
-
-// (Opsional) B) Kalau nanti ganti ke react-qr-reader, tinggal uncomment ini:
-// import { QrReader } from 'react-qr-reader';
-
 export default function QrScannerComponent() {
-  const [status, setStatus] = useState({ type: 'idle', message: '' }); // idle|info|success|error
-  const [scannedToken, setScannedToken] = useState('');
-  const [isScanning, setIsScanning] = useState(true);
-  const isSubmitting = useRef(false); // anti double submit
+  const [status, setStatus] = useState({ type: 'info', msg: 'Arahkan ke QR admin.' });
+  const [busy, setBusy] = useState(false);
 
-  const reset = () => {
-    setIsScanning(true);
-    setScannedToken('');
-    setStatus({ type: 'idle', message: '' });
-    isSubmitting.current = false;
-  };
-
-  const submitToken = async (token) => {
-    if (isSubmitting.current) return;
-    isSubmitting.current = true;
-    setStatus({ type: 'info', message: 'Memvalidasi token…' });
+  const handleDecode = async (text) => {
+    if (!text || busy) return;
+    setBusy(true);
+    setStatus({ type: 'info', msg: 'Memvalidasi token…' });
 
     try {
-      const { data } = await api.post('/attendance/checkin-qr', { qr_token: token });
-      setStatus({ type: 'success', message: data?.message ?? 'Presensi berhasil!' });
-
-      // getaran kecil di HP (kalau didukung)
-      if (navigator.vibrate) navigator.vibrate(40);
+      const { data } = await api.post('/attendance/checkin-qr', { qr_token: text });
+      setStatus({ type: 'success', msg: data.message || 'Check-in berhasil.' });
     } catch (err) {
-      const msg = err?.response?.data?.message || 'Terjadi kesalahan saat check-in.';
-      setStatus({ type: 'error', message: `Absensi gagal: ${msg}` });
-      setIsScanning(true);                 // izinkan scan ulang
-      isSubmitting.current = false;        // buka throttle
+      const msg = err.response?.data?.message || 'Check-in gagal.';
+      setStatus({ type: 'error', msg });
+    } finally {
+      // beri jeda 2 dtk biar tidak spam decode berulang
+      setTimeout(() => setBusy(false), 2000);
     }
   };
 
-  // === Handler untuk react-qr-scanner ===
-  const handleScan = (payload) => {
-    if (!payload || !isScanning) return;
-
-    // Library kadang kirim string langsung, kadang { text }
-    const token = typeof payload === 'string' ? payload : payload?.text;
-    if (!token) return;
-
-    setIsScanning(false);           // stop kamera sementara
-    setScannedToken(token);
-    submitToken(token);
-  };
-
-  const handleError = (e) => {
-    console.error(e);
-    setStatus({ type: 'error', message: 'Gagal mengakses kamera. Izinkan akses kamera lalu coba lagi.' });
+  const handleError = (error) => {
+    console.error(error);
+    setStatus({ type: 'error', msg: 'Gagal mengakses kamera / decode. Cek izin & coba lagi.' });
   };
 
   return (
-    <div className="min-h-screen bg-blue-50 text-slate-900 flex flex-col items-center px-4 py-6">
-      <h1 className="text-2xl font-bold text-blue-700 mb-4 text-center">Scan QR Presensi</h1>
+    <div className="max-w-md mx-auto p-4 bg-white rounded-2xl shadow">
+      <h2 className="text-xl font-bold text-blue-700 text-center mb-3">Scan QR Presensi</h2>
 
-      <div className="w-full max-w-xs rounded-2xl bg-white shadow-md ring-1 ring-slate-200 overflow-hidden">
-        {isScanning ? (
-          <div className="aspect-square w-full">
-            {/* === A) react-qr-scanner === */}
-            <QrScanner
-              delay={250}
-              onError={handleError}
-              onScan={handleScan}
-              style={{ width: '100%', height: '100%' }}
-              constraints={{ video: { facingMode: 'environment' } }}
-            />
-
-            {/* (Opsional) B) Kalau pakai react-qr-reader:
-            <QrReader
-              constraints={{ facingMode: 'environment' }}
-              onResult={(result, error) => {
-                if (result) handleScan(result?.text);
-                if (error) handleError(error);
-              }}
-              videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
-            */}
-          </div>
-        ) : (
-          <div className="p-5 text-center">
-            {status.type === 'info' && <p className="text-slate-600 animate-pulse">Memvalidasi token…</p>}
-            {status.type === 'success' && <p className="text-green-700 font-semibold">{status.message}</p>}
-            {status.type === 'error' && <p className="text-red-600 font-semibold">{status.message}</p>}
-
-            <button
-              onClick={reset}
-              className="mt-4 w-full rounded-xl bg-blue-600 text-white py-2 font-semibold hover:bg-blue-700 active:scale-[.98] transition"
-            >
-              Scan Lagi
-            </button>
-
-            {scannedToken && (
-              <p className="mt-3 text-xs text-slate-500 break-all">
-                Token: <span className="font-mono">{scannedToken}</span>
-              </p>
-            )}
-          </div>
-        )}
+      <div className="rounded-xl overflow-hidden border border-slate-200">
+        <Scanner
+          onScan={handleDecode}
+          onError={handleError}
+          constraints={{
+            audio: false,
+            video: {
+              facingMode: { ideal: 'environment' }, // kamera belakang di HP
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+          }}
+          styles={{
+            container: { width: '100%' },
+            video: { width: '100%', height: '340px', objectFit: 'cover' },
+          }}
+          components={{
+            finder: false, // biar ringan
+          }}
+        />
       </div>
 
-      <p className="mt-4 text-sm text-slate-600 text-center max-w-xs">
-        Arahkan kamera ke QR Code dari admin. Pastikan cahaya cukup dan QR tidak buram.
+      <p className="text-center text-xs text-slate-500 mt-2">
+        Tips: perbesar QR di layar, hindari glare, jarak ±15–25 cm.
       </p>
 
-      {/* Banner status global */}
-      {status.message && (
-        <div
-          className={
-            'fixed bottom-4 left-4 right-4 mx-auto max-w-sm rounded-xl px-4 py-3 text-sm font-medium shadow ' +
-            (status.type === 'success'
-              ? 'bg-green-100 text-green-700 ring-1 ring-green-200'
-              : status.type === 'error'
-              ? 'bg-red-100 text-red-700 ring-1 ring-red-200'
-              : 'bg-slate-100 text-slate-700 ring-1 ring-slate-200')
-          }
-        >
-          {status.message}
-        </div>
-      )}
+      <div className={`mt-3 rounded-lg p-3 text-sm ${
+        status.type === 'success'
+          ? 'bg-green-50 text-green-700 border border-green-200'
+          : status.type === 'error'
+          ? 'bg-red-50 text-red-700 border border-red-200'
+          : 'bg-slate-50 text-slate-700 border border-slate-200'
+      }`}>
+        {status.msg}
+      </div>
+
+      {/* Fallback input manual token (buat jaga2) */}
+      <details className="mt-3 text-sm">
+        <summary className="cursor-pointer text-slate-600">Masukkan token manual (darurat)</summary>
+        <ManualToken onDone={(msg)=>setStatus({type:'success', msg})}/>
+      </details>
+    </div>
+  );
+}
+
+function ManualToken({ onDone }) {
+  const [token, setToken] = useState('');
+  const [loading, setLoading] = useState(false);
+  const submit = async () => {
+    if (!token.trim()) return;
+    setLoading(true);
+    try {
+      const { data } = await api.post('/attendance/checkin-qr', { qr_token: token.trim() });
+      onDone?.(data.message || 'Check-in berhasil.');
+    } catch (e) { alert(e.response?.data?.message || 'Gagal.'); }
+    finally { setLoading(false); }
+  };
+  return (
+    <div className="mt-2 flex gap-2">
+      <input className="flex-1 border rounded-lg px-3 py-2 text-sm"
+             placeholder="Tempel token QR di sini"
+             value={token} onChange={e=>setToken(e.target.value)} />
+      <button onClick={submit} disabled={loading}
+        className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm">
+        Kirim
+      </button>
     </div>
   );
 }

@@ -13,35 +13,46 @@ const QrCheckIn = ({ user }) => {
         setCheckinStatus({ message: 'Gagal mengakses kamera.', type: 'error' });
     };
 
-    const handleScan = async (data) => {
-        if (data && isScanning) {
-            const qr_token = data.text;
-            setScanResult(qr_token);
-            setIsScanning(false); 
-            setLoading(true);
-            setCheckinStatus({ message: 'Memvalidasi token dan melakukan absensi...', type: 'info' });
+    const handleScan = async (res) => {
+        if (!res || !isScanning) return;
 
-            try {
-                const response = await api.post('/attendance/checkin-qr', { 
-                    qr_token: qr_token 
-                });
+        // pastikan hasil scan dikonversi ke string
+        let token = null;
 
-                setCheckinStatus({ 
-                    message: response.data.message, 
-                    type: 'success' 
-                });
-            } catch (err) {
-                const errorMessage = err.response?.data?.message || 'Terjadi kesalahan saat check-in.';
-                setCheckinStatus({ 
-                    message: `Absensi Gagal: ${errorMessage}`, 
-                    type: 'error' 
-                });
-                setIsScanning(true);
-            } finally {
-                setLoading(false);
-            }
+        if (typeof res === 'string') {
+            token = res;
+        } else if (Array.isArray(res)) {
+            token = res[0]?.text || res[0]?.rawValue || null;
+        } else if (typeof res === 'object') {
+            token = res.text || res.rawValue || null;
+        }
+
+        if (!token) return;
+
+        token = String(token).trim();
+
+        setIsScanning(false);
+        setLoading(true);
+        setCheckinStatus({ message: 'Memvalidasi token...', type: 'info' });
+
+        try {
+            const response = await api.post('/attendance/checkin-qr', { qr_token: token });
+            setCheckinStatus({
+                message: response.data.message || 'Absensi berhasil.',
+                type: 'success',
+            });
+        } catch (err) {
+            const errorMessage = err.response?.data?.message || 'Terjadi kesalahan saat check-in.';
+            setCheckinStatus({
+                message: `Absensi Gagal: ${errorMessage}`,
+                type: 'error',
+            });
+            setIsScanning(true);
+        } finally {
+            setLoading(false);
         }
     };
+
     
     const previewStyle = {
         height: 240,

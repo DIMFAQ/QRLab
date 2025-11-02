@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use App\Models\Attendance;
 use App\Models\Member;
+use Carbon\Carbon;
 
 class MeetingController extends Controller
 {
@@ -17,6 +18,16 @@ class MeetingController extends Controller
         return Meeting::withCount('attendances')->orderByDesc('id')->get();
     }
 
+    private function parseDateTime($value): Carbon
+    {
+    // Terima 2 format: HTML datetime-local (YYYY-MM-DDTHH:mm) dan dd/MM/YYYY HH:mm
+        foreach (['Y-m-d\TH:i', 'd/m/Y H:i'] as $fmt) {
+            try { return Carbon::createFromFormat($fmt, $value); } catch (\Throwable $e) {}
+        }
+        // fallback
+        return Carbon::parse($value);
+    }
+
     // A. Membuat sesi pertemuan baru
     public function store(Request $r)
     {
@@ -24,9 +35,18 @@ class MeetingController extends Controller
             'name' => 'required|string|max:255',
             'meeting_number' => 'required|integer|min:1',
             'qr_duration_minutes' => 'required|integer|min:1',
-            'start_time' => 'required|date',
-            'end_time' => 'required|date|after:start_time',
+            'start_time' => 'required',
+            'end_time' => 'required',
         ]);
+
+        $start = $this->parseDateTime($data['start_time']);
+        $end   = $this->parseDateTime($data['end_time']);
+        $dur   = (int) $data['qr_duration_minutes']; // <<– penting: cast ke int
+
+        if ($end->lte($start)) {
+            return response()->json(['message' => 'Waktu selesai harus setelah waktu mulai.'], 422);
+        }
+        $expiresAt = $start->copy()->addMinutes($dur);
 
         $meeting = Meeting::create([
             ...$data,
@@ -103,29 +123,31 @@ class MeetingController extends Controller
         return $meeting->attendances()->with('member')->get();
     }
 
-    public function rekap($id)
+    public function rekap(Meeting $meeting)
     {
-        try {
-            $meeting = Meeting::findOrFail($id);
+        // Ambil semua member (atau batasi sesuai kelas/kelompok jika kamu punya relasinya)
+        $members = Member::query()
+            ->leftJoin('attendances', function ($q) use ($meeting) {
+                $q->on('attendances.member_id', '=', 'members.id')
+                ->where('attendances.meeting_id', $meeting->id);
+            })
+            ->orderBy('members.name')
+            ->get([
+                'members.id as member_id',
+                'members.name',
+                'attendances.id as attendance_id'
+            ]);
 
-            $attendances = $meeting->attendances()
-                ->with('member:id,name')
-                ->get()
-                ->map(function ($a) {
-                    return [
-                        'name' => $a->member->name ?? 'Tidak Dikenal',
-                        'status' => $a->status == 1 ? 'Hadir' : 'Tidak Hadir',
-                    ];
-                });
+        $rekap = $members->map(fn($m) => [
+            'member_id' => $m->member_id,
+            'name'      => $m->name,
+            'status'    => $m->attendance_id ? 'Hadir' : 'Tidak Hadir',
+        ]);
 
-            return response()->json($attendances);
-        } catch (\Throwable $e) {
-            \Log::error($e);
-            return response()->json([
-                'message' => 'Gagal memuat rekap presensi',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return response()->json([
+            'meeting_id' => $meeting->id,
+            'rekap'      => $rekap,
+        ]);
     }
 
 }
