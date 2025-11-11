@@ -1,13 +1,19 @@
+// Isi BARU untuk: qrfe/src/App.jsx
+
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import api from './api';
 import Login from './components/login';
 import AdminMeetings from './components/AdminMeetings';
-import QrScannerComponent from './components/QrScanner';
 import PraktikanDashboard from './pages/PraktikanDashboard';
 import Register from './components/Register';
 import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
+
+// Komponen placeholder untuk halaman baru yang kita tambahkan rutenya
+const ProfilePage = () => <div className="text-center p-10 text-xl font-bold">Halaman Profil (TODO)</div>;
+const HistoryPage = () => <div className="text-center p-10 text-xl font-bold">Halaman Riwayat Presensi (TODO)</div>;
+
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -18,7 +24,8 @@ export default function App() {
     const token = localStorage.getItem('authToken');
     if (token) {
       try {
-        const res = await api.get('/me');
+        // Kita konsisten pakai /user (sesuai file api.php Anda)
+        const res = await api.get('/user'); 
         const normalized = res?.data?.user ?? res?.data ?? null;
         setUser(normalized);
       } catch (e) {
@@ -40,11 +47,7 @@ export default function App() {
     setUser(normalized);
   };
 
-  const handleLogout = async () => {
-    try { await api.post('/logout'); } catch {}
-    localStorage.removeItem('authToken');
-    setUser(null);
-  };
+  // handleLogout dihapus dari sini, karena akan pindah ke sidebar dashboard
 
   if (loading) {
     return (
@@ -60,24 +63,11 @@ export default function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-100 p-4 sm:p-8">
-        <header className="mb-8 flex justify-between items-center bg-white p-4 rounded-lg shadow-md">
-          <h1 className="text-2xl font-bold text-indigo-700">QR Absensi Praktikum</h1>
-          {user && (
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-600 hidden sm:inline">
-                Logged in as: <b>{user?.name ?? '-'}</b> ({role ?? '-'})
-              </span>
-              <button
-                onClick={handleLogout}
-                className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition duration-150"
-              >
-                Logout
-              </button>
-            </div>
-          )}
-        </header>
-
+      {/* DIV UTAMA: 
+        1. Header lama dihapus (untuk menghindari header ganda).
+        2. Padding 'p-4 sm:p-8' dihapus (agar dashboard bisa full screen).
+      */}
+      <div className="min-h-screen bg-gray-100">
         <Routes>
           {/* Login */}
           <Route
@@ -99,10 +89,22 @@ export default function App() {
             element={isAdmin ? <AdminMeetings /> : <Navigate to="/login" replace />}
           />
 
-          {/* Praktikan */}
+          {/* Praktikan (Mengirim 'user' sebagai prop) */}
           <Route
             path="/praktikan"
             element={isPraktikan ? <PraktikanDashboard user={user} /> : <Navigate to="/login" />} />
+
+          {/* RUTE BARU:
+            Ini ditambahkan agar link di sidebar dan profil berfungsi.
+          */}
+          <Route 
+            path="/profil" 
+            element={isPraktikan ? <ProfilePage /> : <Navigate to="/login" />} 
+          />
+          <Route 
+            path="/riwayat" 
+            element={isPraktikan ? <HistoryPage /> : <Navigate to="/login" />} 
+          />
 
           {/* Fallback */}
           <Route

@@ -1,58 +1,52 @@
-// Isi baru untuk: qrfe/src/pages/PraktikanDashboard.jsx
+// Isi BARU untuk: qrfe/src/pages/PraktikanDashboard.jsx
 
-import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import React, { useState } from "react";
+// DIUBAH: Impor 'useNavigate' untuk fungsi logout
+import { Link, useNavigate } from "react-router-dom";
 import api from "../api";
-import { QrScanner } from "../components/QrScanner";
+// DIUBAH: Impor 'QrScanner' sebagai default (menghapus {})
+import QrScanner from "../components/QrScanner";
 
-// Impor ikon-ikon dari folder components
+// Impor ikon-ikon
 import { Logout2 } from "../components/Logout2";
 import { Menu } from "../components/Menu";
 import { Restore } from "../components/Restore";
 import { Scan } from "../components/Scan";
-
-// Impor gambar-gambar dari folder assets
-// import QRLab from "../assets/QR-lab.png"; // DIHAPUS
-// import UASWfKelompok6PresensiPrakBerbasisQrCode21 from "../assets/UAS-WF-KELOMPOK-6-PRESENSI-PRAK-BERBASIS-QR-CODE-2-1.png"; // DIHAPUS
 import image3 from "../assets/image-3.png"; // Ini adalah Logo Universitas
 import image from "../assets/image.png";   // Ini adalah Foto Profil
-// import scan from "../assets/scan.png"; // DIHAPUS
 
-export const PraktikanDashboard = () => {
-    // --- Logika Dinamis dari Kode GitHub Anda ---
-    const [user, setUser] = useState(null);
-    const [error, setError] = useState(null);
+// DIUBAH: Terima 'user' sebagai prop dari App.jsx
+export const PraktikanDashboard = ({ user }) => {
+    // DIHAPUS: useState untuk user dan error (karena sudah didapat dari props)
     const [showScanner, setShowScanner] = useState(false);
+    const navigate = useNavigate(); // DITAMBAH: Untuk fungsi logout
 
-    useEffect(() => {
-        api.get('/user')
-            .then(response => {
-                setUser(response.data);
-            })
-            .catch(err => {
-                console.error("Error fetching user data:", err);
-                setError(err);
-            });
-    }, []);
+    // DIHAPUS: useEffect untuk api.get('/user') (karena sudah di App.jsx)
 
     const handleScanClick = () => {
         setShowScanner(prev => !prev);
     };
 
-    if (!user && !error) {
-        return <div className="flex items-center justify-center min-h-screen bg-[#e9e9e9]">Loading...</div>;
-    }
+    // DITAMBAH: Fungsi logout baru untuk tombol sidebar
+    const handleLogout = async () => {
+        try { 
+            await api.post('/logout'); 
+        } catch (e) {
+            console.error("Gagal logout di API, tapi tetap lanjut logout di frontend");
+        }
+        localStorage.removeItem('authToken');
+        navigate('/login'); // Arahkan kembali ke halaman login
+        window.location.reload(); // Paksa reload untuk membersihkan state di App.jsx
+    };
 
-    if (error) {
-        return <div className="flex items-center justify-center min-h-screen bg-[#e9e9e9]">Error memuat data: {error.message}</div>;
-    }
-    // --- Akhir Logika Dinamis ---
+    // DIHAPUS: Pengecekan 'loading' dan 'error' (karena sudah di App.jsx)
 
     return (
-        <div className="bg-[#e9e9e9] overflow-hidden w-full min-w-[414px] min-h-[896px] relative">
+        // DIUBAH: Hapus 'min-h-[896px]' agar lebih fleksibel
+        <div className="bg-[#e9e9e9] overflow-hidden w-full min-w-[414px] relative">
             
             {/* ================================== */}
-            {/* Top Bar (dari Figma)        */}
+            {/* Top Bar (dari Figma) - INI TETAP ADA */}
             {/* ================================== */}
             <div className="absolute top-0 left-0 w-[414px] h-[68px] bg-[#076bb2]" />
             <Menu className="!absolute !top-5 !left-[15px] !w-[30px] !h-[30px]" />
@@ -65,38 +59,38 @@ export const PraktikanDashboard = () => {
                 />
             </Link>
             
-            {/* Logo QRLab dihapus */}
-
             {/* ================================== */}
             {/* Sidebar (dari Figma)        */}
             {/* ================================== */}
             
-            {/* Gambar latar sidebar dihapus */}
-            
             {/* Elemen sidebar (warna teks diubah jadi hitam) */}
             <div className="w-[416px] h-[25px] top-[34px] left-[-86px] flex items-start absolute">
-                {/* DIUBAH: text-white menjadi text-black */}
                 <div className="relative flex-1 mt-[-1.00px] [font-family:'Arimo-Regular',Helvetica] font-normal text-black text-xs text-center tracking-[0] leading-6">
                     Sistem Presensi Digital
                 </div>
             </div>
-            <div className="w-[416px] h-[25px] top-[140px] left-[-117px] flex items-start absolute">
-                {/* DIUBAH: text-white menjadi text-black */}
+            
+            {/* Link Dashboard */}
+            <Link to="/praktikan" className="w-[416px] h-[25px] top-[140px] left-[-117px] flex items-start absolute">
                 <div className="relative flex-1 mt-[-1.00px] [font-family:'Arimo-Regular',Helvetica] font-normal text-black text-xs text-center tracking-[0] leading-6">
                     Dashboard
                 </div>
-            </div>
+            </Link>
             <Scan
                 className="!absolute !top-[140px] !left-[26px] !w-6 !h-6 !aspect-[1]"
-                color="black" // DIUBAH: color="white" menjadi "black"
+                color="black"
             />
-            <div className="w-[177px] h-[21px] top-[182px] left-4 flex items-start absolute">
+            
+            {/* DIUBAH: "Riwayat Presensi" sekarang menjadi Link */}
+            <Link to="/riwayat" className="w-[177px] h-[21px] top-[182px] left-4 flex items-start absolute">
                 <div className="relative w-[180px] mt-[-1.00px] mb-[-2.00px] mr-[-3.00px] [font-family:'Arimo-Regular',Helvetica] font-normal text-neutral-950 text-xs text-center tracking-[0] leading-6">
                     Riwayat Presensi
                 </div>
-            </div>
+            </Link>
             <Restore className="!absolute !top-[182px] !left-[26px] !w-6 !h-6 !aspect-[1]" />
-            <div className="w-[180px] h-6 top-[219px] -left-2.5 flex items-start absolute">
+            
+            {/* DIUBAH: "Logout" sekarang menjadi tombol fungsional */}
+            <div onClick={handleLogout} className="w-[180px] h-6 top-[219px] -left-2.5 flex items-start absolute cursor-pointer">
                 <div className="relative w-[180px] mt-[-1.00px] [font-family:'Arimo-Regular',Helvetica] font-normal text-neutral-950 text-xs text-center tracking-[0] leading-6">
                     Logout
                 </div>
@@ -114,7 +108,6 @@ export const PraktikanDashboard = () => {
             {/* ================================== */}
             
             {showScanner ? (
-                // TAMPILAN SAAT SCANNER AKTIF
                 <div className="absolute top-[195px] left-0 right-0 w-full px-[20px] z-10 flex flex-col items-center">
                     <div className="ml-[calc(271px/2)]">
                         <QrScanner />
@@ -127,11 +120,8 @@ export const PraktikanDashboard = () => {
                     </button>
                 </div>
             ) : (
-                // TAMPILAN DASHBOARD (DEFAULT)
                 <>
-                    {/* Gambar latar utama dihapus */}
-                    
-                    {/* DIUBAH: text-white menjadi text-black */}
+                    {/* DIUBAH: Menggunakan 'user.name' dari props */}
                     <div className="absolute top-[195px] left-[67px] [font-family:'Arimo-Bold',Helvetica] font-bold text-black text-[28px] text-center tracking-[0] leading-6 whitespace-nowrap">
                         Selamat Datang, {user.name}
                     </div>
