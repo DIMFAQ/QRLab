@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import api from './api';
 import Login from './components/login';
-import AdminMeetings from './components/AdminMeetings';
+import AdminMeetingsPage from './pages/AdminMeetings';
 import QrScannerComponent from './components/QrScanner';
 import PraktikanDashboard from './pages/PraktikanDashboard';
 import Register from './components/Register';
@@ -96,7 +96,7 @@ export default function App() {
           {/* Admin */}
           <Route
             path="/admin"
-            element={isAdmin ? <AdminMeetings /> : <Navigate to="/login" replace />}
+            element={isAdmin ? <AdminMeetingsPage /> : <Navigate to="/login" replace />}
           />
 
           {/* Praktikan */}
