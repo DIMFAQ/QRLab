@@ -39,18 +39,16 @@ class AuthController extends Controller
             'password'   => Hash::make($data['password']),
             'role'       => 'praktikan',
             'member_id'  => $member->id,
+            // email_verified_at sengaja dibiarkan NULL
         ]);
 
-        // Kirim email verifikasi
-        event(new Registered($user));
-        $user->sendEmailVerificationNotification();
-
+        // Pesan diubah untuk memberitahu user agar menunggu persetujuan
         return response()->json([
-            'message' => 'Registrasi berhasil. Cek email untuk verifikasi akun.',
+            'message' => 'Registrasi berhasil. Akun Anda sedang menunggu persetujuan Admin.',
         ], 201);
     }
 
-    // POST /api/login  (asumsikan sudah ada; kalau belum:)
+    // POST /api/login
     public function login(Request $request)
     {
         $credentials = $request->validate([
@@ -65,11 +63,13 @@ class AuthController extends Controller
             return response()->json(['message' => 'Kredensial salah.'], 422);
         }
 
-        // opsional: wajib verified untuk login
-        // if (! $user->hasVerifiedEmail()) {
-        //     return response()->json(['message' => 'Email belum terverifikasi.'], 403);
-        // }
-
+        // --- INI PERBAIKANNYA ---
+        // Wajib verified (disetujui admin) untuk login, TAPI HANYA UNTUK PRAKTIKAN
+        if ($user->role === 'praktikan' && ! $user->hasVerifiedEmail()) {
+            return response()->json(['message' => 'Akun Anda belum disetujui oleh Admin.'], 403);
+        }
+        
+        // Baris `$token = ...` yang hilang sudah dikembalikan
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
@@ -77,8 +77,8 @@ class AuthController extends Controller
                 'id'    => $user->id,
                 'email' => $user->email,
                 'role'  => $user->role,
-                'name'  => optional($user->member)->name,      // buat header FE gampang
-                'npm'   => optional($user->member)->student_id, // optional info
+                'name'  => optional($user->member)->name,
+                'npm'   => optional($user->member)->student_id,
             ],
             'token' => $token,
         ]);
@@ -153,7 +153,7 @@ class AuthController extends Controller
         return response()->json(['message' => __($status)], 422);
     }
 
-    // === Verifikasi Email ===
+    // === Verifikasi Email (Tidak terpakai di alur ini, tapi biarkan saja) ===
 
     // GET /api/email/verify/{id}/{hash}
     public function verify(EmailVerificationRequest $request)

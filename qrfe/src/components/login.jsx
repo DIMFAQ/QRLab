@@ -1,61 +1,166 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../api';
+import api from '../api'; // Import api yang sudah ada
 
-export default function Login({ onLogin }) {
-  const [email, setEmail] = useState('');
+// Komponen Ikon QR (dibuat ulang dengan Tailwind agar skalabel)
+const QRIcon = () => (
+  <div className="w-16 h-16 bg-[#076BB2] rounded-2xl shadow-lg p-3 grid grid-cols-2 gap-[5px]">
+    <div className="w-full h-full border-[4px] border-[#E9E9E9] rounded-sm"></div>
+    <div className="w-full h-full border-[4px] border-[#E9E9E9] rounded-sm"></div>
+    <div className="w-full h-full border-[4px] border-[#E9E9E9] rounded-sm"></div>
+    <div className="w-full h-full border-[4px] border-[#E9E9E9] rounded-sm"></div>
+  </div>
+);
+
+// Nama komponen diubah jadi Login (sesuai nama file)
+function Login({ onLogin }) { 
+  // --- LOGIKA DARI FILE ASLI ANDA ---
+  // Kita gunakan 'username' agar sesuai dengan UI, bukan 'email'
+  const [username, setUsername] = useState(''); 
   const [password, setPassword] = useState('');
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false); // Tambahan dari UI baru
 
   const submit = async (e) => {
     e.preventDefault();
-    setLoading(true); setMsg('');
+    setLoading(true); 
+    setMsg('');
     try {
-      const { data } = await api.post('/login', { email, password });
+      // Mengirim {username, password} ke API
+      // Pastikan backend Anda (qrbe) menerima 'username'. 
+      // Jika backend *harus* menerima 'email', ganti state di atas
+      const { data } = await api.post('/login', { 
+        email: username, // Mengirim state username sebagai 'email'
+        password: password 
+      });
+      
       const token = data.token;
       const user  = data.user ?? data;
       localStorage.setItem('authToken', token);
-      onLogin?.(user, token);
+      onLogin?.(user, token); // Memanggil prop onLogin dari App.jsx
     } catch (err) {
-      setMsg(err.response?.data?.message || 'Gagal login. Cek email/password.');
+      setMsg(err.response?.data?.message || 'Gagal login. Cek username/password.');
     } finally {
       setLoading(false);
     }
   };
-
-  const input = 'mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm';
+  // --- AKHIR LOGIKA ---
 
   return (
-    <div className="max-w-md mx-auto bg-white p-6 rounded-xl shadow ring-1 ring-slate-200">
-      <h2 className="text-xl font-bold mb-4 text-blue-700">Masuk</h2>
-      <form onSubmit={submit} className="grid gap-3">
-        <div>
-          <label className="text-sm font-medium">Email</label>
-          <input type="email" className={input} value={email}
-                 onChange={(e)=>setEmail(e.target.value)} required />
+    <div className="flex items-center justify-center min-h-screen bg-[#E9E9E9] p-4 font-arimo">
+      <div className="w-full max-w-sm">
+        
+        {/* --- Bagian Logo dan Judul --- */}
+        <div className="flex flex-col items-center mb-4">
+          <QRIcon />
+          <h1 
+            className="text-5xl text-black font-arya mt-4" 
+            style={{ textShadow: '0px 4px 4px rgba(0, 0, 0, 0.25)' }}
+          >
+            QR-Lab
+          </h1>
+          <p className="text-base text-gray-900 mt-1">
+            Sistem Presensi Digital
+          </p>
         </div>
-        <div>
-          <label className="text-sm font-medium">Password</label>
-          <input type="password" className={input} value={password}
-                 onChange={(e)=>setPassword(e.target.value)} required />
-        </div>
-        <button disabled={loading}
-                className="mt-2 w-full rounded-xl bg-blue-600 text-white py-2 font-semibold hover:bg-blue-700">
-          {loading ? 'Memproses…' : 'Login'}
-        </button>
-        {msg && <p className="text-sm mt-2 text-red-600">{msg}</p>}
-      </form>
 
-      {/* Link register & lupa password */}
-      <div className="mt-4 flex items-center justify-between text-sm">
-        <Link to="/register" className="text-blue-600 hover:underline">
-          Buat akun baru
-        </Link>
-        <Link to="/forgot-password" className="text-blue-600 hover:underline">
-          Lupa password?
-        </Link>
+        {/* --- Kartu Form Login --- */}
+        <div 
+          className="bg-white rounded-2xl p-7" 
+          style={{ boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.30)' }}
+        >
+          <h2 className="text-base font-bold text-gray-900 mb-5">
+            Masuk
+          </h2>
+          
+          {/* Form sekarang memiliki handler onSubmit */}
+          <form onSubmit={submit}>
+            {/* --- Input Username --- */}
+            <div className="mb-4">
+              <label className="block text-sm text-gray-900 mb-1" htmlFor="username">
+                Username
+              </label>
+              <input
+                type="text" // Di file asli Anda 'email', tapi UI-nya 'username'
+                id="username"
+                placeholder="Masukkan username"
+                className="w-full px-4 py-2.5 bg-[#E9E9E9] rounded-lg text-sm text-gray-900 placeholder:text-[#717171] focus:outline-none focus:ring-2 focus:ring-[#076BB2]"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* --- Input Password --- */}
+            <div className="mb-2">
+              <label className="block text-sm text-gray-900 mb-1" htmlFor="password">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  placeholder="Masukkan password"
+                  className="w-full px-4 py-2.5 bg-[#E9E9E9] rounded-lg text-sm text-gray-900 placeholder:text-[#717171] focus:outline-none focus:ring-2 focus:ring-[#076BB2]"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-[#076BB2] text-sm font-semibold"
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </div>
+
+            {/* --- Link Lupa Password --- */}
+            <div className="text-right mb-5">
+              <Link 
+                to="/forgot-password" // Link dari file asli
+                className="text-sm text-[#076BB2] hover:underline"
+              >
+                Lupa Password?
+              </Link>
+            </div>
+
+            {/* --- Pesan Error (dari file asli) --- */}
+            {msg && <p className="text-sm text-center text-red-600 mb-3">{msg}</p>}
+
+            {/* --- Tombol Masuk --- */}
+            <button
+              type="submit" // Tipe submit untuk memicu form
+              disabled={loading} // Disable saat loading (dari file asli)
+              className="w-full bg-[#076BB2] text-white text-sm font-bold py-2.5 rounded-lg hover:bg-blue-800 transition duration-300 disabled:opacity-50"
+            >
+              {/* Teks tombol dinamis (dari file asli) */}
+              {loading ? 'Memproses...' : 'Masuk'}
+            </button>
+          </form>
+
+          {/* --- Link Daftar --- */}
+          <p className="text-center text-sm text-gray-900 mt-8">
+            Belum punya akun?{' '}
+            <Link 
+              to="/register" // Link dari file asli
+              className="text-[#076BB2] hover:underline"
+            >
+              Daftar Sekarang
+            </Link>
+          </p>
+        </div>
+
+        {/* --- Footer --- */}
+        <div className="text-center text-xs text-gray-900 mt-12">
+          © 2025 QR-Lab Unila | Fakultas Teknik
+        </div>
       </div>
     </div>
   );
 }
+
+// Pastikan export default
+export default Login;
