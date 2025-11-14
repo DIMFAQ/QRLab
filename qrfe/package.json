@@ -15,6 +15,7 @@
     "qrcode.react": "^4.2.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-qr-scanner": "^1.0.0-alpha.11",
     "react-router-dom": "^7.9.5"
   },
   "devDependencies": {
@@ -31,7 +32,10 @@
     "postcss": "^8.5.6",
     "react-scripts": "^0.0.0",
     "tailwindcss": "^4.1.16",
-    "vite": "^5.0.4",
+    "vite": "npm:rolldown-vite@7.1.14",
     "vite-plugin-mkcert": "^1.17.9"
+  },
+  "overrides": {
+    "vite": "npm:rolldown-vite@7.1.14"
   }
 }
