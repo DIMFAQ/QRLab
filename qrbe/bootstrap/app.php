@@ -17,7 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         
         // --- BLOK INI ADALAH PENAMBAHAN WAJIB ---
         $middleware->alias([
-            'admin' => IsAdmin::class, // INI ADALAH ALIAS YANG DICARI OLEH ROUTE ANDA
+            'is_admin' => IsAdmin::class, // UBAH MENJADI 'is_admin' agar sama dengan di file routes/api.php
         ]);
         // ----------------------------------------
 
