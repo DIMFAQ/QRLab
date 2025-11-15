@@ -11,34 +11,26 @@ import ResetPassword from './components/ResetPassword';
 
 export default function App() {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  
-  // State untuk melacak apakah otentikasi sedang berjalan (lebih jelas dari hanya 'loading')
-  const [isAuthChecking, setIsAuthChecking] = useState(true); 
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   // Fungsi untuk mendapatkan data pengguna saat token tersedia
   const fetchUser = async () => {
     const token = localStorage.getItem('authToken');
     if (!token) {
-        // Jika tidak ada token, set state dan hentikan loading
         setUser(null);
         setIsAuthChecking(false);
         return;
     }
-    
+
     try {
-        // Panggil /me untuk memverifikasi token dan mendapatkan data pengguna
         const res = await api.get('/me');
-        // Normalisasi response: ambil data dari res.data.user atau res.data
         const normalized = res?.data?.user ?? res?.data ?? null;
         setUser(normalized);
-        
-        // Simpan role ke localStorage untuk akses cepat jika perlu
-        localStorage.setItem('userRole', normalized?.role ?? ''); 
+        localStorage.setItem('userRole', normalized?.role ?? '');
     } catch (e) {
         // Token tidak valid/expired, bersihkan storage
         localStorage.removeItem('authToken');
-        localStorage.removeItem('userRole'); 
+        localStorage.removeItem('userRole');
         setUser(null);
     } finally {
         setIsAuthChecking(false);
@@ -46,29 +38,31 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Panggil saat aplikasi dimulai atau setelah logout/login
     fetchUser();
-  }, []); // Hanya berjalan saat mount
+  }, []);
 
   const handleLogin = (userData, token) => {
     localStorage.setItem('authToken', token);
-    
-    // Normalisasi dan set user state secara langsung untuk update UI cepat
     const normalized = userData?.user ?? userData ?? null;
     setUser(normalized);
     localStorage.setItem('userRole', normalized?.role ?? '');
-
-    // Set loading ke true agar App me-render ulang dan memastikan role
-    // setIsAuthChecking(true); 
-    // fetchUser(); // Optional: Panggil lagi untuk double-check via API
+    // Tidak perlu memanggil fetchUser() atau setIsAuthChecking(true) lagi, 
+    // karena state setUser sudah memicu render ulang.
   };
 
   const handleLogout = async () => {
-    try { await api.post('/logout'); } catch {} // Coba logout di backend
+    // PERBAIKAN: Mengabaikan error 401 Unauthorized saat logout karena token sudah dihapus di sisi client
+    try { 
+        await api.post('/logout'); 
+    } catch (e) {
+        console.error("Logout API failed or token expired, cleaning client state.", e);
+    }
+    
+    // Ini harus dijalankan terlepas dari hasil request backend
     localStorage.removeItem('authToken');
     localStorage.removeItem('userRole');
     setUser(null);
-    setIsAuthChecking(false); // Langsung selesai checking
+    setIsAuthChecking(false);
   };
 
   // ----------------------------------------------------
@@ -86,6 +80,10 @@ export default function App() {
   const isAdmin = role === 'admin';
   const isPraktikan = role === 'praktikan';
   const isLoggedIn = !!user;
+
+  // Helper untuk menentukan path dashboard yang benar
+  const getDashboardPath = () => isAdmin ? '/admin' : '/praktikan';
+
 
   return (
     <Router>
@@ -108,44 +106,56 @@ export default function App() {
         </header>
 
         <Routes>
-          {/* Rute Login & Auth Lain */}
+          {/* 1. RUTE UTAMA (ROOT PATH) - Mencegah Loop dari /login */}
           <Route
-            path="/login"
-            element={isLoggedIn ? <Navigate to={isAdmin ? '/admin' : '/praktikan'} replace /> : <Login onLogin={handleLogin} />}
-          />
-          <Route path="/register" element={isLoggedIn ? <Navigate to={isAdmin ? "/admin" : "/praktikan"} /> : <Register />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          
-          {/* Rute Admin (Terproteksi) */}
-          <Route
-            path="/admin"
-            element={isAdmin ? <AdminMeetings /> : <Navigate to={isLoggedIn ? '/praktikan' : '/login'} replace />}
-          />
-
-          {/* Rute Praktikan (Terproteksi) */}
-          <Route
-            path="/praktikan"
-            element={isPraktikan ? <PraktikanDashboard user={user} /> : <Navigate to={isLoggedIn ? '/admin' : '/login'} />} />
-
-          {/* Rute Scanner (Asumsi ini rute kamera) */}
-          <Route 
-             path="/scan" 
-             element={isLoggedIn ? <QrScannerComponent /> : <Navigate to="/login" />} 
-          />
-
-          {/* Fallback (Jika rute tidak ditemukan) */}
-          <Route
-            path="*"
+            path="/"
             element={
-              <Navigate
-                to={isLoggedIn ? (isAdmin ? '/admin' : '/praktikan') : '/login'}
-                replace
-              />
+              isLoggedIn ? (
+                <Navigate to={getDashboardPath()} replace />
+              ) : (
+                <Navigate to="/login" replace />
+              )
             }
           />
+
+          {/* 2. Rute Login & Auth Lain */}
+          <Route
+            path="/login"
+            element={isLoggedIn ? <Navigate to={getDashboardPath()} replace /> : <Login onLogin={handleLogin} />}
+          />
+          <Route path="/register" element={isLoggedIn ? <Navigate to={getDashboardPath()} /> : <Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+
+          {/* 3. Rute Admin (Terproteksi) */}
+          <Route
+            path="/admin"
+            element={isAdmin ? <AdminMeetings /> : <Navigate to={isLoggedIn ? getDashboardPath() : '/login'} replace />}
+          />
+
+          {/* 4. Rute Praktikan (Terproteksi) */}
+          <Route
+            path="/praktikan"
+            element={isPraktikan ? <PraktikanDashboard user={user} /> : <Navigate to={isLoggedIn ? getDashboardPath() : '/login'} />} />
+
+          {/* 5. Rute Scanner (Terproteksi) */}
+          <Route
+             path="/scan"
+             element={isLoggedIn ? <QrScannerComponent /> : <Navigate to="/login" />}
+          />
+
+          {/* 6. FALLBACK (404 Not Found) - Mengganti Fallback Loop yang Lama */}
+          <Route path="*" element={<NotFound />} />
+
         </Routes>
       </div>
     </Router>
   );
 }
+
+// Komponen sederhana untuk 404 Not Found
+const NotFound = () => (
+    <div className="text-center p-20 text-red-500 text-xl">
+        404 | Halaman Tidak Ditemukan
+    </div>
+);

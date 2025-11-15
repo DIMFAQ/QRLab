@@ -1,34 +1,54 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api';
 import MeetingForm from './MeetingForm';
 import { QRCodeCanvas as QRCode } from 'qrcode.react';
 
 export default function AdminMeetings() {
+  // meetings diinisialisasi sebagai array kosong dan loading state
   const [meetings, setMeetings] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeQr, setActiveQr] = useState(null);
   const [error, setError] = useState('');
   const [rekapModal, setRekapModal] = useState({ open: false, data: null });
 
-  const fetchMeetings = async () => {
-    try {
-      const { data } = await api.get('/admin/meetings');
-      setMeetings(data);
-      const open = data.find((m) => m.is_open);
-      if (open) await fetchActiveQr(open.id);
-      else setActiveQr(null);
-    } catch {
-      setError('Gagal memuat daftar pertemuan.');
-    }
-  };
-
-  const fetchActiveQr = async (meetingId) => {
+  // 1. Definisikan fetchActiveQr menggunakan useCallback
+  const fetchActiveQr = useCallback(async (meetingId) => {
     try {
       const { data } = await api.get(`/admin/meetings/${meetingId}/active-qr`);
       setActiveQr(data);
     } catch {
       setActiveQr(null);
     }
-  };
+  }, []);
+
+  // 2. Definisikan fetchMeetings menggunakan useCallback
+  const fetchMeetings = useCallback(async () => {
+    setError('');
+    try {
+      const res = await api.get('/admin/meetings');
+      
+      // PERBAIKAN KRUSIAL: Pengecekan data untuk format Laravel API
+      const meetingData = res.data?.data ?? res.data;
+      
+      if (Array.isArray(meetingData)) {
+        setMeetings(meetingData);
+        
+        // Logika untuk fetch QR aktif (jika ada)
+        const open = meetingData.find((m) => m.is_open);
+        if (open) await fetchActiveQr(open.id);
+        else setActiveQr(null);
+      } else {
+        // Jika data bukan array (e.g., objek kosong), set ke array kosong
+        setMeetings([]);
+        console.error("API response is not an array:", res.data);
+      }
+    } catch (e) {
+      setError('Gagal memuat daftar pertemuan. Cek koneksi API.');
+      setMeetings([]); 
+    } finally {
+      setLoading(false); // Selesai loading
+    }
+  }, [fetchActiveQr]); // Tambahkan fetchActiveQr sebagai dependency
 
   const handleMeetingCreated = (payload) => {
     fetchMeetings();
@@ -39,7 +59,8 @@ export default function AdminMeetings() {
     if (!confirm('Tutup sesi presensi ini?')) return;
     try {
       await api.post(`/admin/meetings/${meetingId}/close`);
-      await fetchMeetings();
+      // Tunggu hingga sesi tertutup baru fetch ulang data
+      await fetchMeetings(); 
       setActiveQr(null);
     } catch {
       setError('Gagal menutup sesi.');
@@ -49,7 +70,8 @@ export default function AdminMeetings() {
   const handleShowRekap = async (meetingId) => {
     try {
       const res = await api.get(`/admin/meetings/${meetingId}/rekap`);
-      setRekapModal({ open: true, data: res.data });
+      const rekapData = res.data?.data ?? res.data;
+      setRekapModal({ open: true, data: Array.isArray(rekapData) ? rekapData : [] });
     } catch {
       alert('Gagal memuat rekap presensi');
     }
@@ -57,11 +79,35 @@ export default function AdminMeetings() {
 
   const closeRekap = () => setRekapModal({ open: false, data: null });
 
+  // 3. Perbaikan useEffect untuk Stabilitas
   useEffect(() => {
-    fetchMeetings();
-    const id = setInterval(fetchMeetings, 30000);
-    return () => clearInterval(id);
-  }, []);
+    // Jalankan fetch pertama kali saat komponen dimuat
+    fetchMeetings(); 
+
+    // Atur interval pembaruan tanpa dependency array di interval
+    const id = setInterval(fetchMeetings, 30000); 
+
+    // Clean-up function (WAJIB)
+    return () => clearInterval(id); 
+  }, [fetchMeetings]); // Dependency pada fetchMeetings (fungsi useCallback)
+
+  // Penanganan loading untuk mencegah layar putih
+  if (loading) {
+    return (
+      <div className="text-center p-20 text-xl font-semibold text-slate-700 min-h-screen">
+        Memuat Data Pertemuan...
+      </div>
+    );
+  }
+  
+  // Jika loading selesai tetapi ada error
+  if (error && meetings.length === 0) {
+      return (
+        <div className="text-center p-20 text-red-600 text-xl min-h-screen">
+            ❌ {error} Pastikan Backend (Laravel) Aktif!
+        </div>
+      );
+  }
 
   return (
     <div className="min-h-screen bg-blue-50 text-slate-900">
@@ -109,6 +155,7 @@ export default function AdminMeetings() {
             <h3 className="text-lg font-semibold text-slate-800">Riwayat Pertemuan</h3>
           </div>
 
+          {/* Pengecekan aman karena meetings dijamin array kosong saat error/kosong */}
           {meetings.length === 0 ? (
             <p className="text-center text-slate-500 italic">Belum ada pertemuan.</p>
           ) : (
@@ -168,7 +215,8 @@ export default function AdminMeetings() {
               Rekap Presensi
             </h3>
 
-            {rekapModal.data && rekapModal.data.length > 0 ? (
+            {/* Pengecekan aman: Array.isArray(rekapModal.data) */}
+            {rekapModal.data && Array.isArray(rekapModal.data) && rekapModal.data.length > 0 ? (
               <ul className="divide-y divide-slate-200 max-h-64 overflow-y-auto">
                 {rekapModal.data.map((a, i) => (
                   <li key={i} className="py-2 flex justify-between items-center text-sm">

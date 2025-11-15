@@ -4,7 +4,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Member extends Model
 {
-    protected $fillable = ['student_id', 'name'];
+    protected $fillable = ['student_id', 'name', 'user_id'];
     public function user() { return $this->hasOne(User::class); }
     public function attendances() { return $this->hasMany(Attendance::class); }
 }

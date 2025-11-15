@@ -4,6 +4,7 @@ const api = axios.create({
     baseURL: 'https://untouching-nonsupplementary-thiago.ngrok-free.dev/api', 
     headers: {
         'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
     },
 });
 
