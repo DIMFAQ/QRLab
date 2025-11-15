@@ -12,61 +12,7 @@ use App\Models\User; // <-- PASTIKAN User DI-IMPORT
 
 class AdminController extends Controller
 {
-    // GET /api/admin/meetings
-    public function getAllMeetings()
-    {
-        $meetings = Meeting::withCount('attendances')->get();
-        return response()->json($meetings);
-    }
 
-    // GET /api/admin/meetings/{id}
-    public function getMeetingDetails($id)
-    {
-        $meeting = Meeting::with('attendances.member')->findOrFail($id);
-        return response()->json($meeting);
-    }
-
-    // POST /api/admin/meetings/{id}/generate-qr
-    public function generateNewQrCode($id)
-    {
-        $meeting = Meeting::findOrFail($id);
-        $token = Str::random(40);
-        $expiresAt = now()->addMinutes(2); // QR code berlaku 2 menit
-
-        // Simpan sesi QR baru
-        QrSession::create([
-            'meeting_id' => $meeting->id,
-            'token' => $token,
-            'expires_at' => $expiresAt,
-        ]);
-
-        // Simpan token di cache untuk validasi cepat
-        Cache::put('qr_token_' . $token, $meeting->id, $expiresAt);
-
-        return response()->json([
-            'token' => $token,
-            'expires_at' => $expiresAt->toIso8601String(),
-        ]);
-    }
-
-    // GET /api/admin/meetings/{id}/attendance
-    public function getMeetingAttendance($id)
-    {
-        $meeting = Meeting::findOrFail($id);
-        $attendance = $meeting->attendances()->with('member')->get();
-
-        return response()->json([
-            'meeting' => $meeting,
-            'attendance' => $attendance,
-        ]);
-    }
-
-    // --- FUNGSI BARU UNTUK VERIFIKASI ADMIN ---
-
-    /**
-     * Mengambil semua user yang belum diverifikasi (antrian)
-     * GET /api/admin/users/pending
-     */
     public function getPendingUsers(Request $request)
     {
         // Cari semua user 'praktikan' yang email_verified_at nya masih null
@@ -100,5 +46,54 @@ class AdminController extends Controller
         $user->save();
 
         return response()->json(['message' => 'User ' . $user->name . ' berhasil disetujui.']);
+    }
+
+    // --- FUNGSI BARU DITAMBAHKAN UNTUK MENIRU DIMFAQ ---
+
+    public function generateGlobalQrToken(Request $request)
+    {
+        // HANYA hapus sesi QR global sebelumnya (meeting_id = null)
+        // Ini tidak akan mengganggu QR spesifik per-meeting
+        QrSession::whereNull('meeting_id')->delete();
+
+        $token = Str::random(12); // Mengikuti panjang token DIMFAQ
+        $expiry = now()->addMinutes(10); // Mengikuti durasi DIMFAQ
+
+        // Buat sesi QR baru TANPA meeting_id (menandakan ini sesi global)
+        $qrSession = QrSession::create([
+            'token' => $token,
+            'expires_at' => $expiry,
+            'meeting_id' => null, // Ini adalah pembedanya
+        ]);
+
+        // Simpan di cache (opsional, 'global' sbg pembeda dari meeting_id)
+        Cache::put('qr_token_' . $token, 'global', $expiry);
+
+        // Format response disamakan dengan AdminController DIMFAQ
+        return response()->json([
+            'message' => 'Sesi QR Code global berhasil dibuat.',
+            'qr_token' => $qrSession->token,
+            'expires_at' => $qrSession->expires_at->toDateTimeString(),
+        ], 201);
+    }
+
+    public function getActiveGlobalQrToken(Request $request)
+    {
+        // Cari sesi QR global (meeting_id = null) yang masih aktif
+        $session = QrSession::where('expires_at', '>', now())
+                            ->whereNull('meeting_id')
+                            ->first();
+
+        if (!$session) {
+            // Response 404 ini yang diharapkan oleh frontend AdminQrManager.jsx
+            return response()->json(['message' => 'Tidak ada sesi QR yang aktif saat ini.'], 404);
+        }
+
+        // Format response disamakan dengan yang diharapkan AdminQrManager.jsx
+        return response()->json([
+            'qr_token' => $session->token,
+            'expires_at' => $session->expires_at->toDateTimeString(),
+            'minutes_left' => now()->diffInMinutes($session->expires_at)
+        ]);
     }
 }

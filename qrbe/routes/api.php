@@ -32,15 +32,34 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // Rute Admin (terproteksi + cek role admin)
-Route::middleware(['auth:sanctum', 'is_admin'])->group(function () {
-    Route::get('/admin/meetings', [AdminController::class, 'getAllMeetings']);
-    Route::get('/admin/meetings/{id}', [AdminController::class, 'getMeetingDetails']);
-    Route::post('/admin/meetings/{id}/generate-qr', [AdminController::class, 'generateNewQrCode']);
-    Route::get('/admin/meetings/{id}/attendance', [AdminController::class, 'getMeetingAttendance']);
+// [FIX] Menggunakan prefix('admin') agar rapi seperti dimfaq
+Route::prefix('admin')->middleware(['auth:sanctum', 'is_admin'])->group(function () { 
 
-    // --- RUTE BARU UNTUK VERIFIKASI ADMIN ---
-    Route::get('/admin/users/pending', [AdminController::class, 'getPendingUsers']);
-    Route::post('/admin/users/{id}/approve', [AdminController::class, 'approveUser']);
+    // === Rute Manajemen Meeting (Arahkan ke MeetingController) ===
+    
+    // [FIX] Tambahkan rute POST untuk membuat meeting (store)
+    Route::post('/meetings', [MeetingController::class, 'store']);
+    
+    // [FIX] Arahkan GET meetings ke MeetingController@index
+    Route::get('/meetings', [MeetingController::class, 'index']);
+    
+    // [FIX] Gunakan {meeting} untuk parameter agar Model Binding bekerja
+    // Arahkan semua rute lain ke MeetingController
+    Route::post('/meetings/{meeting}/close', [MeetingController::class, 'close']);
+    Route::get('/meetings/{meeting}/active-qr', [MeetingController::class, 'getActiveQr']);
+    Route::get('/meetings/{meeting}/report', [MeetingController::class, 'report']);
+    Route::get('/meetings/{meeting}/rekap', [MeetingController::class, 'rekap']);
+    Route::post('/meetings/{meeting}/qr', [MeetingController::class, 'generateQrToken']);
+
+    // Rute {id} lama yang menunjuk ke AdminController (jika masih dipakai FE)
+    // Sebaiknya FE diupdate agar tidak pakai ini lagi
+    // Route::get('/meetings/{id}', [AdminController::class, 'getMeetingDetails']); 
+    // Route::get('/meetings/{id}/attendance', [AdminController::class, 'getMeetingAttendance']);
+
+    
+    // === Rute Verifikasi User (Ini sudah benar di AdminController) ===
+    Route::get('/users/pending', [AdminController::class, 'getPendingUsers']);
+    Route::post('/users/{id}/approve', [AdminController::class, 'approveUser']);
 });
 
 // Rute verifikasi email (jika diperlukan nanti)
