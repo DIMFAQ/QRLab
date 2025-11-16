@@ -37,29 +37,29 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'is_admin'])->group(function
 
     // === Rute Manajemen Meeting (Arahkan ke MeetingController) ===
     
-    // [FIX] Tambahkan rute POST untuk membuat meeting (store)
     Route::post('/meetings', [MeetingController::class, 'store']);
-    
-    // [FIX] Arahkan GET meetings ke MeetingController@index
     Route::get('/meetings', [MeetingController::class, 'index']);
     
-    // [FIX] Gunakan {meeting} untuk parameter agar Model Binding bekerja
-    // Arahkan semua rute lain ke MeetingController
     Route::post('/meetings/{meeting}/close', [MeetingController::class, 'close']);
     Route::get('/meetings/{meeting}/active-qr', [MeetingController::class, 'getActiveQr']);
-    Route::get('/meetings/{meeting}/report', [MeetingController::class, 'report']);
     Route::get('/meetings/{meeting}/rekap', [MeetingController::class, 'rekap']);
-    Route::post('/meetings/{meeting}/qr', [MeetingController::class, 'generateQrToken']);
+    Route::post('/meetings/{meeting}/qr', [MeetingController::class, 'generateQrToken']); // Ini mungkin tidak terpakai jika 'store' sdh generate QR
 
-    // Rute {id} lama yang menunjuk ke AdminController (jika masih dipakai FE)
-    // Sebaiknya FE diupdate agar tidak pakai ini lagi
-    // Route::get('/meetings/{id}', [AdminController::class, 'getMeetingDetails']); 
-    // Route::get('/meetings/{id}/attendance', [AdminController::class, 'getMeetingAttendance']);
+    // --- [BARU] RUTE UNTUK "BUKA ULANG" ---
+    // Ini adalah endpoint yang dipanggil frontend saat tombol "Buka Ulang" diklik
+    Route::post('/meetings/{meeting}/reopen', [MeetingController::class, 'reopen']);
 
-    
+
     // === Rute Verifikasi User (Ini sudah benar di AdminController) ===
     Route::get('/users/pending', [AdminController::class, 'getPendingUsers']);
     Route::post('/users/{id}/approve', [AdminController::class, 'approveUser']);
+
+    // --- [BARU] RUTE CRUD MAHASISWA ---
+    Route::get('/users', [AdminController::class, 'getAllPraktikan']); // Ambil daftar
+    Route::post('/users', [AdminController::class, 'storePraktikan']); // Simpan (Tambah)
+    // (Opsional) Rute untuk tombol Edit/Hapus
+    Route::put('/users/{user}', [AdminController::class, 'updatePraktikan']);
+    Route::delete('/users/{user}', [AdminController::class, 'deletePraktikan']);
 });
 
 // Rute verifikasi email (jika diperlukan nanti)

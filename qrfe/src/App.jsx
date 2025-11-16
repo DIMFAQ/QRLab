@@ -1,19 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import api from './api';
+
+// Layout & Halaman Admin (Baru)
+import AdminLayout from './layouts/AdminLayout';
+import AdminDashboard from './pages/AdminDashboard';
+import AdminKelolaSesi from './pages/AdminKelolaSesi';
+import AdminKelolaMahasiswa from './pages/AdminKelolaMahasiswa';
+import AdminRekapAbsensi from './pages/AdminRekapAbsensi';
+
+// Halaman Lain
 import Login from './components/login';
-import AdminMeetingsPage from './pages/AdminMeetings';
 import QrScannerComponent from './components/QrScanner';
 import PraktikanDashboard from './pages/PraktikanDashboard';
 import Register from './components/Register';
 import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
 
-export default function App() {
+function AppContent() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
 
-  // Normalisasi respons /me -> bisa { user: {...} } atau langsung {...}
+  const isAuthRoute =
+    location.pathname.startsWith('/login') ||
+    location.pathname.startsWith('/register') ||
+    location.pathname.startsWith('/forgot-password') ||
+    location.pathname.startsWith('/reset-password');
+
+  const isAdminRoute = location.pathname.startsWith('/admin');
+
   const fetchUser = async () => {
     const token = localStorage.getItem('authToken');
     if (token) {
@@ -35,13 +51,14 @@ export default function App() {
 
   const handleLogin = (userData, token) => {
     localStorage.setItem('authToken', token);
-    // userData juga dinormalisasi, jaga-jaga backend kirim { user, token }
     const normalized = userData?.user ?? userData ?? null;
     setUser(normalized);
   };
 
   const handleLogout = async () => {
-    try { await api.post('/logout'); } catch {}
+    try {
+      await api.post('/logout');
+    } catch {}
     localStorage.removeItem('authToken');
     setUser(null);
   };
@@ -58,9 +75,15 @@ export default function App() {
   const isAdmin = role === 'admin';
   const isPraktikan = role === 'praktikan';
 
+  const layoutClass = isAdminRoute
+    ? 'min-h-screen bg-[#E9E9E9]'
+    : isAuthRoute
+    ? 'min-h-screen bg-gray-100'
+    : 'min-h-screen bg-gray-100 p-4 sm:p-8';
+
   return (
-    <Router>
-      <div className="min-h-screen bg-gray-100 p-4 sm:p-8">
+    <div className={layoutClass}>
+      {!isAdminRoute && !isAuthRoute && (
         <header className="mb-8 flex justify-between items-center bg-white p-4 rounded-lg shadow-md">
           <h1 className="text-2xl font-bold text-indigo-700">QR Absensi Praktikum</h1>
           {user && (
@@ -77,45 +100,53 @@ export default function App() {
             </div>
           )}
         </header>
+      )}
 
-        <Routes>
-          {/* Login */}
-          <Route
-            path="/login"
-            element={
-              user ? (
-                <Navigate to={isAdmin ? '/admin' : '/praktikan'} replace />
-              ) : (
-                <Login onLogin={handleLogin} />
-              )
-            }
-          />
-        <Route path="/register" element={user ? <Navigate to={isAdmin ? "/admin" : "/praktikan"} /> : <Register />} />
+      <Routes>
+        {/* Rute Auth */}
+        <Route
+          path="/login"
+          element={user ? <Navigate to={isAdmin ? '/admin' : '/praktikan'} replace /> : <Login onLogin={handleLogin} />}
+        />
+        <Route
+          path="/register"
+          element={user ? <Navigate to={isAdmin ? '/admin' : '/praktikan'} replace /> : <Register />}
+        />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-          {/* Admin */}
-          <Route
-            path="/admin"
-            element={isAdmin ? <AdminMeetingsPage /> : <Navigate to="/login" replace />}
-          />
 
-          {/* Praktikan */}
-          <Route
-            path="/praktikan"
-            element={isPraktikan ? <PraktikanDashboard user={user} /> : <Navigate to="/login" />} />
+        {/* Rute Admin (Bersarang/Nested) */}
+        <Route
+          path="/admin"
+          element={isAdmin ? <AdminLayout user={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
+        >
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="sesi" element={<AdminKelolaSesi />} />
+          <Route path="mahasiswa" element={<AdminKelolaMahasiswa />} />
+          <Route path="rekap" element={<AdminRekapAbsensi />} />
+        </Route>
 
-          {/* Fallback */}
-          <Route
-            path="*"
-            element={
-              <Navigate
-                to={user ? (isAdmin ? '/admin' : '/praktikan') : '/login'}
-                replace
-              />
-            }
-          />
-        </Routes>
-      </div>
+        {/* Rute Praktikan */}
+        <Route
+          path="/praktikan"
+          element={isPraktikan ? <PraktikanDashboard user={user} /> : <Navigate to="/login" replace />}
+        />
+
+        {/* Fallback */}
+        <Route
+          path="*"
+          element={<Navigate to={user ? (isAdmin ? '/admin' : '/praktikan') : '/login'} replace />}
+        />
+      </Routes>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 }
