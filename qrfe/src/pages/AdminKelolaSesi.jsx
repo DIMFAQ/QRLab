@@ -1,95 +1,126 @@
 import React, { useEffect, useState } from "react";
 import api from "../api";
+import { Link } from "react-router-dom";
 
 export default function AdminKelolaSesi() {
-  const [classes, setClasses] = useState([]);
+  const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // === LOAD DATA (Pakai endpoint yang benar) ===
   const load = async () => {
     setLoading(true);
     try {
-      const res = await api.get("/admin/classes");
-      setClasses(res.data || []);
+      const res = await api.get("/admin/meetings");
+      setMeetings(res.data || []);
     } catch (e) {
-      console.error("Load kelas error:", e);
-      setClasses([]);
+      console.error("Load meeting error:", e);
+      setMeetings([]);
     }
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
-  const startMeeting = async (id) => {
+  // === MULAI PERSEMUNAN (OPEN SESSION) ===
+  const startMeeting = async (meetingId) => {
     try {
-      await api.post(`/admin/classes/${id}/open`);
+      if (!window.confirm("Mulai pertemuan ini?")) return;
+      await api.post(`/admin/meetings/${meetingId}/qr`);
+      alert("Sesi berhasil dibuka!");
       load();
     } catch (e) {
-      alert("Gagal membuka sesi");
+      alert("Gagal membuka sesi: " + (e.response?.data?.message || e.message));
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <h1 className="text-3xl font-semibold mb-6">Kelola Sesi</h1>
 
-      {loading ? <div>Memuat...</div> : (
-
-        classes.length === 0
-        ? <div className="text-slate-500">Belum ada kelas.</div>
-        : <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-          {classes.map(cls => (
-            <div key={cls.id} className="bg-white border rounded-lg shadow-sm p-5">
-
+      {/* LOADING */}
+      {loading ? (
+        <div>Memuat...</div>
+      ) : meetings.length === 0 ? (
+        <div className="text-slate-500 bg-white p-6 rounded-lg shadow-md">
+          Belum ada sesi.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
+          {meetings.map((m) => (
+            <div
+              key={m.id}
+              className="bg-white border rounded-lg shadow-md p-5 flex flex-col h-full"
+            >
               {/* Header */}
-              <div className="flex justify-between">
-                <span className="bg-blue-50 text-blue-600 px-2 py-1 text-xs rounded">{cls.kode}</span>
-                <span className="text-xs text-gray-400">{cls.hari}</span>
+              <div className="flex justify-between items-center mb-3">
+                <span className="bg-blue-100 text-blue-700 px-3 py-1 text-xs rounded-full font-medium">
+                  {m.code || m.kode || `Pertemuan ${m.meeting_number}`}
+                </span>
+
+                <span className="text-sm text-gray-500">
+                  {m.date ? new Date(m.date).toLocaleDateString() : ""}
+                </span>
               </div>
 
-              {/* Title */}
-              <div className="mt-3 text-lg font-semibold">{cls.name}</div>
+              {/* Nama Praktikum */}
+              <div className="text-xl font-semibold text-gray-800">
+                {m.name}
+              </div>
 
               {/* Info */}
-              <div className="mt-2 text-sm text-gray-500">{cls.jam}</div>
-              <div className="text-sm text-gray-500">{cls.ruangan}</div>
+              <div className="mt-2 text-sm text-gray-600">
+                {m.time || m.jam || "-"}
+              </div>
 
-              {/* Stats */}
-              <div className="flex justify-between mt-4 text-sm">
-                <div>
-                  <div className="text-gray-400">Total Pertemuan</div>
-                  <div className="font-bold">{cls.total_pertemuan}</div>
+              <div className="text-sm text-gray-600">
+                {m.room || m.ruangan || "-"}
+              </div>
+
+              <div className="flex-grow"></div>
+
+              {/* Statistik */}
+              <div className="flex justify-between mt-5 pt-4 border-t">
+                <div className="text-center">
+                  <div className="text-xs text-gray-500 uppercase">
+                    Total Pertemuan
+                  </div>
+                  <div className="font-bold text-lg">
+                    {m.attendances_count ?? 0}
+                  </div>
                 </div>
 
-                <div>
-                  <div className="text-gray-400">Kehadiran Rata-rata</div>
-                  <div className="font-bold">{cls.kehadiran_rata2}%</div>
+                <div className="text-center">
+                  <div className="text-xs text-gray-500 uppercase">
+                    Kehadiran Rata-rata
+                  </div>
+                  <div className="font-bold text-lg">
+                    {m.average_attendance ?? 0}%
+                  </div>
                 </div>
               </div>
 
-              {/* Buttons */}
+              {/* Tombol */}
               <div className="flex gap-3 mt-5">
                 <button
-                  onClick={() => startMeeting(cls.id)}
-                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg"
+                  onClick={() => startMeeting(m.id)}
+                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-700"
                 >
                   Mulai Pertemuan
                 </button>
 
-                <a
-                  href={`/admin/rekap?meeting=${cls.id}`}
-                  className="flex-1 border px-4 py-2 rounded-lg text-center"
+                <Link
+                  to={`/admin/rekap?meeting=${m.id}`}
+                  className="flex-1 border border-gray-300 px-4 py-2 rounded-lg text-center text-gray-700 hover:bg-gray-50"
                 >
                   Rekap
-                </a>
+                </Link>
               </div>
-
             </div>
           ))}
-
         </div>
-
       )}
-
     </div>
   );
 }

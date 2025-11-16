@@ -96,4 +96,75 @@ class AdminController extends Controller
             'minutes_left' => now()->diffInMinutes($session->expires_at)
         ]);
     }
+    // Di dalam file: qrbe/app/Http/Controllers/API/AdminController.php
+
+    // ... (fungsi-fungsi lain seperti getStats, getClasses, dll)
+
+    /**
+     * GANTI FUNGSI LAMA ANDA DENGAN YANG INI.
+     * Fungsi ini sekarang menangani parameter 'search'.
+     */
+    public function getMahasiswa(Request $request)
+    {
+        // 1. Ambil kata kunci pencarian dari request
+        $searchTerm = $request->query('search');
+
+        // 2. Buat query dasar untuk member
+        $query = Member::with('user')
+            ->whereHas('user', function ($query) {
+                $query->where('role', 'member');
+            });
+
+        // 3. Tambahkan filter pencarian JIKA searchTerm tidak kosong
+        if ($searchTerm) {
+            $query->where(function ($q) use ($searchTerm) {
+                // Cari berdasarkan NPM di tabel 'members'
+                $q->where('npm', 'like', "%{$searchTerm}%")
+                  // ATAU cari berdasarkan Nama di tabel 'users' (via relasi)
+                  ->orWhereHas('user', function ($userQuery) use ($searchTerm) {
+                      $userQuery->where('name', 'like', "%{$searchTerm}%");
+                  });
+            });
+        }
+
+        // 4. Eksekusi query
+        $members = $query->get();
+
+        // 5. Map data untuk frontend (Logika ini sudah Anda miliki sebelumnya)
+        $mahasiswa = $members->map(function ($member) {
+            return [
+                'id' => $member->id, // Kita gunakan member->id untuk ID unik di tabel
+                'npm' => $member->npm,
+                'name' => $member->user->name,
+                'email' => $member->user->email,
+            ];
+        });
+
+        return response()->json($mahasiswa);
+    }
+
+    /**
+     * Fungsi ini (deleteMahasiswa) sudah benar, tidak perlu diubah.
+     */
+    public function deleteMahasiswa($id)
+    {
+        // $id di sini merujuk ke ID dari tabel 'members', bukan 'users'
+        // Ini PENTING karena $id berasal dari $member->id di frontend
+        $member = Member::find($id);
+
+        if (!$member) {
+            return response()->json(['message' => 'Mahasiswa tidak ditemukan'], 404);
+        }
+
+        // Hapus user terkait dan member
+        // (Anda bisa sesuaikan logika ini, misal hanya hapus member)
+        if ($member->user) {
+            $member->user->delete(); // Hapus data di tabel 'users'
+        }
+        $member->delete(); // Hapus data di tabel 'members'
+
+        return response()->json(['message' => 'Mahasiswa berhasil dihapus']);
+    }
+
+    // ... (fungsi-fungsi lainnya)
 }
