@@ -131,8 +131,10 @@ export default function AdminMeetingsPage({ user, onLogout }) {
 
       {/* Logout di Sidebar Bawah (sesuai gambar) */}
       <div className="p-4 border-t border-gray-200">
-        <button onClick={onLogout} className="flex items-center gap-4 p-4 rounded-lg text-lg text-[#717182] font-bold bg-[#D9D9D9] w-full hover:bg-gray-300">
-          <IconPlaceholder />
+        <button
+          onClick={onLogout}
+          className="flex items-center px-4 py-2 mt-4 text-red-600 hover:bg-red-100 rounded-lg"
+        >
           Logout
         </button>
       </div>

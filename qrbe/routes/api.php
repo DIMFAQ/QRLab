@@ -25,9 +25,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // Rute Praktikan
+// Rute Praktikan
     Route::post('/praktikan/check-in', [AttendanceController::class, 'checkIn']);
-    Route::get('/praktikan/history', [PraktikanController::class, 'getAttendanceHistory']);
+    Route::get('/praktikan/history', [PraktikanController::class, 'getAttendanceHistory']); 
     Route::get('/praktikan/meetings', [PraktikanController::class, 'getActiveMeetings']);
 });
 
