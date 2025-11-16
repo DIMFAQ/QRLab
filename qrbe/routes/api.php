@@ -32,37 +32,30 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // Rute Admin (terproteksi + cek role admin)
-// [FIX] Menggunakan prefix('admin') agar rapi seperti dimfaq
 Route::prefix('admin')->middleware(['auth:sanctum', 'is_admin'])->group(function () { 
 
-    // === Rute Manajemen Meeting (Arahkan ke MeetingController) ===
-    
+    // === Rute Manajemen Meeting (TETAP ADA) ===
     Route::post('/meetings', [MeetingController::class, 'store']);
     Route::get('/meetings', [MeetingController::class, 'index']);
-    
     Route::post('/meetings/{meeting}/close', [MeetingController::class, 'close']);
     Route::get('/meetings/{meeting}/active-qr', [MeetingController::class, 'getActiveQr']);
     Route::get('/meetings/{meeting}/rekap', [MeetingController::class, 'rekap']);
-    Route::post('/meetings/{meeting}/qr', [MeetingController::class, 'generateQrToken']); // Ini mungkin tidak terpakai jika 'store' sdh generate QR
-
-    // --- [BARU] RUTE UNTUK "BUKA ULANG" ---
-    // Ini adalah endpoint yang dipanggil frontend saat tombol "Buka Ulang" diklik
+    Route::post('/meetings/{meeting}/qr', [MeetingController::class, 'generateQrToken']); 
     Route::post('/meetings/{meeting}/reopen', [MeetingController::class, 'reopen']);
 
-
-    // === Rute Verifikasi User (Ini sudah benar di AdminController) ===
+    // === Rute Verifikasi User (TETAP ADA) ===
     Route::get('/users/pending', [AdminController::class, 'getPendingUsers']);
     Route::post('/users/{id}/approve', [AdminController::class, 'approveUser']);
 
-    // --- [BARU] RUTE CRUD MAHASISWA ---
-    Route::get('/users', [AdminController::class, 'getAllPraktikan']); // Ambil daftar
-    Route::post('/users', [AdminController::class, 'storePraktikan']); // Simpan (Tambah)
-    // (Opsional) Rute untuk tombol Edit/Hapus
-    Route::put('/users/{user}', [AdminController::class, 'updatePraktikan']);
-    Route::delete('/users/{user}', [AdminController::class, 'deletePraktikan']);
+    // === [FIX] RUTE CRUD MAHASISWA ===
+    // Nama fungsi ini sudah benar sesuai AdminController di atas
+    Route::get('/users', [AdminController::class, 'getMahasiswa']);
+    Route::post('/users', [AdminController::class, 'storePraktikan']);
+    Route::put('/users/{id}', [AdminController::class, 'updatePraktikan']);
+    Route::delete('/users/{id}', [AdminController::class, 'deleteMahasiswa']);
 });
 
-// Rute verifikasi email (jika diperlukan nanti)
+// Rute verifikasi email
 Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verify'])
     ->middleware(['auth:sanctum', 'signed'])
     ->name('verification.verify');

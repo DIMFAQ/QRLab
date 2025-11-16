@@ -8,29 +8,34 @@ use App\Models\QrSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
-use App\Models\User; // <-- PASTIKAN User DI-IMPORT
+use App\Models\User;
+
+// Impor yang diperlukan
+use App\Models\Member;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+
 
 class AdminController extends Controller
 {
 
     public function getPendingUsers(Request $request)
     {
-        // Cari semua user 'praktikan' yang email_verified_at nya masih null
+        // Fungsi ini TETAP ADA
         $pendingUsers = User::where('role', 'praktikan')
                             ->whereNull('email_verified_at')
-                            ->with('member') // Ambil data member (NPM, Nama)
-                            ->orderBy('created_at', 'asc') // Tampilkan yang paling lama mendaftar
+                            ->with('member') 
+                            ->orderBy('created_at', 'asc') 
                             ->get();
 
         return response()->json($pendingUsers);
     }
 
-    /**
-     * Menyetujui (memverifikasi) seorang user
-     * POST /api/admin/users/{id}/approve
-     */
     public function approveUser(Request $request, $id)
     {
+        // Fungsi ini TETAP ADA
         $user = User::find($id);
 
         if (! $user) {
@@ -41,35 +46,24 @@ class AdminController extends Controller
             return response()->json(['message' => 'User sudah terverifikasi'], 400);
         }
 
-        // Setujui user dengan mengisi tanggal verifikasi
         $user->email_verified_at = now();
         $user->save();
 
         return response()->json(['message' => 'User ' . $user->name . ' berhasil disetujui.']);
     }
 
-    // --- FUNGSI BARU DITAMBAHKAN UNTUK MENIRU DIMFAQ ---
-
     public function generateGlobalQrToken(Request $request)
     {
-        // HANYA hapus sesi QR global sebelumnya (meeting_id = null)
-        // Ini tidak akan mengganggu QR spesifik per-meeting
+        // Fungsi ini TETAP ADA
         QrSession::whereNull('meeting_id')->delete();
-
-        $token = Str::random(12); // Mengikuti panjang token DIMFAQ
-        $expiry = now()->addMinutes(10); // Mengikuti durasi DIMFAQ
-
-        // Buat sesi QR baru TANPA meeting_id (menandakan ini sesi global)
+        $token = Str::random(12);
+        $expiry = now()->addMinutes(10); 
         $qrSession = QrSession::create([
             'token' => $token,
             'expires_at' => $expiry,
-            'meeting_id' => null, // Ini adalah pembedanya
+            'meeting_id' => null,
         ]);
-
-        // Simpan di cache (opsional, 'global' sbg pembeda dari meeting_id)
         Cache::put('qr_token_' . $token, 'global', $expiry);
-
-        // Format response disamakan dengan AdminController DIMFAQ
         return response()->json([
             'message' => 'Sesi QR Code global berhasil dibuat.',
             'qr_token' => $qrSession->token,
@@ -79,64 +73,64 @@ class AdminController extends Controller
 
     public function getActiveGlobalQrToken(Request $request)
     {
-        // Cari sesi QR global (meeting_id = null) yang masih aktif
+        // Fungsi ini TETAP ADA
         $session = QrSession::where('expires_at', '>', now())
                             ->whereNull('meeting_id')
                             ->first();
-
         if (!$session) {
-            // Response 404 ini yang diharapkan oleh frontend AdminQrManager.jsx
             return response()->json(['message' => 'Tidak ada sesi QR yang aktif saat ini.'], 404);
         }
-
-        // Format response disamakan dengan yang diharapkan AdminQrManager.jsx
         return response()->json([
             'qr_token' => $session->token,
             'expires_at' => $session->expires_at->toDateTimeString(),
             'minutes_left' => now()->diffInMinutes($session->expires_at)
         ]);
     }
-    // Di dalam file: qrbe/app/Http/Controllers/API/AdminController.php
-
-    // ... (fungsi-fungsi lain seperti getStats, getClasses, dll)
-
+    
     /**
-     * GANTI FUNGSI LAMA ANDA DENGAN YANG INI.
-     * Fungsi ini sekarang menangani parameter 'search'.
+     * [FUNGSI BARU] Fungsi getMahasiswa (CRUD)
      */
     public function getMahasiswa(Request $request)
     {
-        // 1. Ambil kata kunci pencarian dari request
         $searchTerm = $request->query('search');
+        $status = $request->query('status'); 
 
-        // 2. Buat query dasar untuk member
         $query = Member::with('user')
-            ->whereHas('user', function ($query) {
-                $query->where('role', 'member');
+            ->whereHas('user', function ($q) {
+                $q->where('role', 'praktikan');
             });
 
-        // 3. Tambahkan filter pencarian JIKA searchTerm tidak kosong
+        if ($status && $status !== 'all') {
+            if ($status === 'pending') {
+                $query->whereHas('user', function ($q) {
+                    $q->whereNull('email_verified_at');
+                });
+            } elseif ($status === 'active') {
+                $query->whereHas('user', function ($q) {
+                    $q->whereNotNull('email_verified_at');
+                });
+            }
+        }
+
         if ($searchTerm) {
             $query->where(function ($q) use ($searchTerm) {
-                // Cari berdasarkan NPM di tabel 'members'
-                $q->where('npm', 'like', "%{$searchTerm}%")
-                  // ATAU cari berdasarkan Nama di tabel 'users' (via relasi)
+                $q->where('student_id', 'like', "%{$searchTerm}%") 
+                  ->orWhere('name', 'like', "%{$searchTerm}%")
                   ->orWhereHas('user', function ($userQuery) use ($searchTerm) {
                       $userQuery->where('name', 'like', "%{$searchTerm}%");
                   });
             });
         }
 
-        // 4. Eksekusi query
-        $members = $query->get();
+        $members = $query->orderBy('created_at', 'desc')->get();
 
-        // 5. Map data untuk frontend (Logika ini sudah Anda miliki sebelumnya)
         $mahasiswa = $members->map(function ($member) {
             return [
-                'id' => $member->id, // Kita gunakan member->id untuk ID unik di tabel
-                'npm' => $member->npm,
-                'name' => $member->user->name,
+                'id' => $member->id,
+                'student_id' => $member->student_id, 
+                'name' => $member->user->name, 
                 'email' => $member->user->email,
+                'status' => $member->user->email_verified_at ? 'active' : 'pending'
             ];
         });
 
@@ -144,27 +138,132 @@ class AdminController extends Controller
     }
 
     /**
-     * Fungsi ini (deleteMahasiswa) sudah benar, tidak perlu diubah.
+     * [FUNGSI BARU] Fungsi storePraktikan (CRUD)
      */
-    public function deleteMahasiswa($id)
+    public function storePraktikan(Request $request)
     {
-        // $id di sini merujuk ke ID dari tabel 'members', bukan 'users'
-        // Ini PENTING karena $id berasal dari $member->id di frontend
+        $validator = Validator::make($request->all(), [
+            'student_id' => 'required|string|unique:members,student_id', 
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email',
+            'password' => 'nullable|string|min:6', 
+            'status' => 'required|string|in:pending,active',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Validasi gagal', 'errors' => $validator->errors()], 422);
+        }
+
+        $data = $validator->validated();
+
+        try {
+            DB::beginTransaction();
+
+            $user = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => $data['password'] ? Hash::make($data['password']) : Hash::make(Str::random(10)),
+                'role' => 'praktikan',
+                'email_verified_at' => $data['status'] === 'active' ? now() : null,
+            ]);
+
+            Member::create([
+                'user_id' => $user->id,
+                'student_id' => $data['student_id'],
+                'name' => $data['name'] // <--- Perbaikan error NOT NULL
+            ]);
+
+            DB::commit(); 
+
+            return response()->json(['message' => 'Mahasiswa berhasil ditambahkan'], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack(); 
+            return response()->json(['message' => 'Gagal menambahkan mahasiswa: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * [FUNGSI BARU] Fungsi updatePraktikan (CRUD)
+     */
+    public function updatePraktikan(Request $request, $id)
+    {
+        $member = Member::with('user')->find($id);
+
+        if (!$member || !$member->user) {
+            return response()->json(['message' => 'Data mahasiswa tidak ditemukan'], 404);
+        }
+        
+        $user = $member->user;
+
+        $validator = Validator::make($request->all(), [
+            'student_id' => [
+                'required',
+                'string',
+                Rule::unique('members')->ignore($member->id),
+            ],
+            'name' => 'required|string|max:255',
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                Rule::unique('users')->ignore($user->id),
+            ],
+            'password' => 'nullable|string|min:6', 
+            'status' => 'required|string|in:pending,active',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Validasi gagal', 'errors' => $validator->errors()], 422);
+        }
+
+        $data = $validator->validated();
+
+        try {
+            DB::beginTransaction();
+
+            $user->name = $data['name'];
+            $user->email = $data['email'];
+            $user->email_verified_at = $data['status'] === 'active' ? now() : null;
+
+            if (!empty($data['password'])) {
+                $user->password = Hash::make($data['password']);
+            }
+            $user->save();
+
+            $member->student_id = $data['student_id'];
+            $member->name = $data['name']; // <--- Perbaikan error NOT NULL
+            $member->save();
+
+            DB::commit(); 
+
+            return response()->json(['message' => 'Data mahasiswa berhasil diperbarui']);
+
+        } catch (\Exception $e) {
+            DB::rollBack(); 
+            return response()->json(['message' => 'Gagal memperbarui data: ' . $e->getMessage()], 500);
+        }
+    }
+
+
+    /**
+     * [FUNGSI BARU] Fungsi deleteMahasiswa (CRUD)
+     */
+    public function deleteMahasiswa($id) 
+    {
         $member = Member::find($id);
 
         if (!$member) {
             return response()->json(['message' => 'Mahasiswa tidak ditemukan'], 404);
         }
 
-        // Hapus user terkait dan member
-        // (Anda bisa sesuaikan logika ini, misal hanya hapus member)
         if ($member->user) {
-            $member->user->delete(); // Hapus data di tabel 'users'
+            $member->user->delete(); 
         }
-        $member->delete(); // Hapus data di tabel 'members'
+        $member->delete(); 
 
         return response()->json(['message' => 'Mahasiswa berhasil dihapus']);
     }
 
-    // ... (fungsi-fungsi lainnya)
 }
