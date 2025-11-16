@@ -6,12 +6,12 @@ export default function QrScannerComponent({ onDetected }) {
   const scannerRef = useRef(null);
 
   useEffect(() => {
-    const videoElem = videoRef.current;
+    const video = videoRef.current;
 
     scannerRef.current = new QrScanner(
-      videoElem,
+      video,
       (result) => {
-        if (onDetected) onDetected(result.data);
+        if (result?.data) onDetected(result.data);
       },
       {
         highlightScanRegion: false,
@@ -19,11 +19,11 @@ export default function QrScannerComponent({ onDetected }) {
       }
     );
 
-    scannerRef.current.start();
+    scannerRef.current
+      .start()
+      .catch((e) => console.error("Camera error:", e));
 
-    return () => {
-      scannerRef.current?.stop();
-    };
+    return () => scannerRef.current?.stop();
   }, [onDetected]);
 
   return (

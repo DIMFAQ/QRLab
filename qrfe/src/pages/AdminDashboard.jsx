@@ -1,80 +1,92 @@
-import React, { useState, useEffect } from 'react';
-import api from '../api'; // Perlu api untuk fetch data stats
+import React, { useEffect, useState } from "react";
+import api from "../api";
+import { Bar } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Tooltip,
+  Legend,
+} from "chart.js";
 
-// Ikon placeholder
-const IconPlaceholder = ({ className = "w-8 h-8" }) => <div className={`${className} bg-gray-300 rounded`}></div>;
-
-// Komponen Kartu Statistik
-const StatCard = ({ title, value, icon, color }) => (
-  <div className="bg-white p-6 rounded-lg border-2 border-[rgba(112,112,112,0.63)] flex justify-between items-center">
-    <div>
-      <div className="text-2xl text-[#717182] mb-2">{title}</div>
-      <div className="text-5xl font-bold text-slate-800">{value}</div>
-    </div>
-    <div className={`w-16 h-16 rounded-full ${color} flex items-center justify-center`}>
-      {icon}
-    </div>
-  </div>
-);
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({
-    mahasiswa: 0,
-    sesiAktif: 0,
-    kehadiran: '0%',
-  });
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({});
+  const [weekly, setWeekly] = useState({
+    labels: [],
+    hadir: [],
+    total: [],
+  });
 
-  // TODO: Ganti dengan endpoint API Anda yang sebenarnya untuk data dashboard
   useEffect(() => {
-    const fetchStats = async () => {
+    const loadDashboard = async () => {
       setLoading(true);
-      try {
-        // PANGGIL API DI SINI
-        // const { data } = await api.get('/admin/stats');
-        
-        // Data dummy untuk sekarang
-        const dummyData = {
-          mahasiswa: 137,
-          sesiAktif: 2,
-          kehadiran: '93%',
-        };
-        setStats(dummyData);
 
-      } catch (error) {
-        console.error("Gagal memuat stats", error);
-        // Set data error/default
-        setStats({ mahasiswa: 'Error', sesiAktif: 'Error', kehadiran: 'Error' });
-      } finally {
-        setLoading(false);
+      try {
+        const s = await api.get("/admin/stats");
+        setStats(s.data || {});
+      } catch (e) {
+        console.log("Stats error:", e);
       }
+
+      try {
+        const w = await api.get("/admin/stats/weekly");
+        setWeekly(w.data || { labels: [], hadir: [], total: [] });
+      } catch (e) {
+        console.log("Weekly error:", e);
+      }
+
+      setLoading(false);
     };
 
-    fetchStats();
+    loadDashboard();
   }, []);
-  
-  const valueDisplay = (val) => (loading ? '...' : val);
+
+  const chartData = {
+    labels: weekly.labels,
+    datasets: [
+      {
+        label: "Hadir",
+        data: weekly.hadir,
+        backgroundColor: "#2563EB",
+      },
+      {
+        label: "Total Mahasiswa",
+        data: weekly.total,
+        backgroundColor: "#D9E6FF",
+      },
+    ],
+  };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <StatCard
-        title="Total Mahasiswa"
-        value={valueDisplay(stats.mahasiswa)}
-        icon={<IconPlaceholder />}
-        color="bg-[#C4DBEC]"
-      />
-      <StatCard
-        title="Sesi Praktikum Aktif"
-        value={valueDisplay(stats.sesiAktif)}
-        icon={<IconPlaceholder />}
-        color="bg-[rgba(144,226,162,0.79)]"
-      />
-      <StatCard
-        title="Kehadiran Hari Ini"
-        value={valueDisplay(stats.kehadiran)}
-        icon={<IconPlaceholder />}
-        color="bg-[rgba(255,234,0,0.45)]"
-      />
+    <div className="space-y-6">
+      
+      {/* CARD STATISTIK */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        
+        {[
+          { label: "Total Mahasiswa", key: "mahasiswa" },
+          { label: "Total Dosen", key: "dosen" },
+          { label: "Total Kelas", key: "kelas" },
+          { label: "Pertemuan Hari Ini", key: "pertemuan" },
+        ].map((item, i) => (
+          <div key={i} className="bg-white p-5 rounded-lg border shadow-sm">
+            <div className="text-xs text-gray-500">{item.label}</div>
+            <div className="text-3xl font-bold mt-2">{stats[item.key] ?? 0}</div>
+          </div>
+        ))}
+
+      </div>
+
+      {/* GRAFIK */}
+      <div className="bg-white p-6 rounded-lg border shadow-sm">
+        <h3 className="font-semibold mb-4">Grafik Kehadiran Minggu Ini</h3>
+        <Bar data={chartData} />
+      </div>
+
     </div>
   );
 }

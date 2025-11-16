@@ -1,101 +1,161 @@
-import React from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+// src/layouts/AdminLayout.jsx
+import React, { useState } from "react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 
-// Impor ikon placeholder (gantilah dengan ikon React jika ada)
-const IconDashboard = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6-4a1 1 0 001-1v-1a1 1 0 10-2 0v1a1 1 0 001 1z"></path></svg>;
-const IconSesi = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>;
-const IconMahasiswa = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>;
-const IconRekap = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>;
-const IconLogout = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>;
-const IconQR = () => <svg className="w-full h-full text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>;
+export default function AdminLayout({ user, onLogout }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
 
+  // Derive simple page title from path (Dashboard, Kelola Sesi, dsb.)
+  const routeToTitle = (pathname) => {
+    if (pathname.startsWith("/admin/sesi")) return "Kelola Sesi";
+    if (pathname.startsWith("/admin/rekap")) return "Rekap Absensi";
+    if (pathname.startsWith("/admin/mahasiswa")) return "Kelola Mahasiswa";
+    return "Dashboard";
+  };
 
-// Komponen NavLink kustom untuk styling
-const SidebarNavLink = ({ to, children }) => {
-  const baseStyle = "flex items-center gap-4 p-4 rounded-lg text-lg font-bold";
-  const activeStyle = "bg-[#076BB2] text-white";
-  const inactiveStyle = "text-[#717182] hover:bg-gray-100";
+  const title = routeToTitle(location.pathname);
 
-  return (
+  const NavItem = ({ to, children, exact = false }) => (
     <NavLink
       to={to}
-      className={({ isActive }) => `${baseStyle} ${isActive ? activeStyle : inactiveStyle}`}
+      end={exact}
+      className={({ isActive }) =>
+        `flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-sm ${
+          isActive ? "bg-[#E6F0FF] text-[#1E40AF]" : "text-slate-700 hover:bg-slate-50"
+        }`
+      }
+      onClick={() => setMobileOpen(false)}
     >
       {children}
     </NavLink>
   );
-};
 
-// Sidebar (dari desain Anda)
-const SidebarNav = ({ onLogout }) => (
-  <div className="w-[332px] h-screen bg-white shadow-lg flex flex-col fixed left-0 top-0 z-20">
-    {/* Sidebar Header */}
-    <div className="flex items-center gap-3 p-4 h-[114px] border-b border-gray-200">
-      <div className="w-16 h-16 bg-[#076BB2] rounded-2xl flex items-center justify-center p-3">
-        <IconQR />
-      </div>
-      <div className="text-3xl font-['Arya'] font-bold text-black">Admin QR-Lab</div>
-    </div>
-
-    {/* Navigasi */}
-    <nav className="flex-grow p-4 space-y-2">
-      <SidebarNavLink to="dashboard">
-        <IconDashboard />
-        Dashboard
-      </SidebarNavLink>
-      <SidebarNavLink to="sesi">
-        <IconSesi />
-        Kelola Sesi
-      </SidebarNavLink>
-      <SidebarNavLink to="rekap">
-        <IconRekap />
-        Rekap Absensi
-      </SidebarNavLink>
-      <SidebarNavLink to="mahasiswa">
-        <IconMahasiswa />
-        Kelola Mahasiswa
-      </SidebarNavLink>
-    </nav>
-
-    {/* Logout */}
-    <div className="p-4 border-t border-gray-200">
-      <button onClick={onLogout} className="flex items-center gap-4 p-4 rounded-lg text-lg text-[#717182] font-bold bg-[#D9D9D9] w-full hover:bg-gray-300">
-        <IconLogout />
-        Logout
-      </button>
-    </div>
-  </div>
-);
-
-// Header Utama (dari desain Anda)
-const MainHeader = ({ user }) => (
-  <header className="h-[114px] bg-white flex justify-between items-center p-8 border-b border-gray-200 sticky top-0 z-10">
-    {/* Judul Halaman akan dinamis nanti, untuk sekarang 'Dashboard' */}
-    <h1 className="text-4xl font-['Arimo'] font-bold text-slate-800">Dashboard</h1>
-    <div className="flex items-center gap-4">
-      <span className="text-xl font-['Arimo'] hidden md:inline">{user?.name ?? 'Admin'}</span>
-      <img
-        className="w-14 h-14 rounded-full"
-        src="https://placehold.co/55x55" // Placeholder avatar
-        alt="Admin"
-      />
-    </div>
-  </header>
-);
-
-// Layout Utama
-export default function AdminLayout({ user, onLogout }) {
   return (
-    <div className="flex w-full h-full min-h-screen">
-      <SidebarNav onLogout={onLogout} />
-
-      <div className="flex-1 flex flex-col ml-[332px]">
-        <MainHeader user={user} />
-
-        {/* Konten Halaman (Dashboard, Sesi, dll.) akan dirender di sini */}
-        <div className="flex-1 p-8 overflow-y-auto">
-          <Outlet /> 
+    <div className="min-h-screen flex bg-[#f6f9fc]">
+      {/* Sidebar desktop */}
+      <aside className="hidden lg:flex w-64 bg-white border-r border-slate-200 flex-col">
+        <div className="px-6 py-5 border-b">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-[#2563EB] rounded-lg flex items-center justify-center text-white font-bold">QR</div>
+            <div>
+              <div className="text-lg font-semibold">PresensiQR</div>
+              <div className="text-xs text-slate-500">Admin Panel</div>
+            </div>
+          </div>
         </div>
+
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-auto">
+          <NavItem to="/admin/dashboard" exact>
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <span className="font-medium">Dashboard</span>
+          </NavItem>
+
+          <div className="text-xs text-slate-400 px-3 mt-4 mb-2">Master Data</div>
+
+          <NavItem to="/admin/mahasiswa">
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4S14.21 4 12 4 8 5.79 8 8s1.79 4 4 4zM6 20a6 6 0 0112 0" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <span className="font-medium">Mahasiswa</span>
+          </NavItem>
+
+          <NavItem to="/admin/sesi">
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7h18M6 7v12a2 2 0 002 2h8a2 2 0 002-2V7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <span className="font-medium">Kelola Sesi</span>
+          </NavItem>
+
+          <NavItem to="/admin/rekap">
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <span className="font-medium">Rekap Kehadiran</span>
+          </NavItem>
+        </nav>
+
+        <div className="p-4 border-t">
+          <div className="flex items-center gap-3">
+            <img src={user?.avatar || "https://placehold.co/40x40"} alt="avatar" className="w-10 h-10 rounded-full" />
+            <div>
+              <div className="text-sm font-medium truncate">{user?.name || "Admin"}</div>
+              <div className="text-xs text-slate-500 truncate">{user?.member?.npm || user?.email}</div>
+            </div>
+          </div>
+
+          <button
+            onClick={onLogout}
+            className="mt-4 w-full text-left px-3 py-2 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700"
+          >
+            Logout
+          </button>
+        </div>
+      </aside>
+
+      {/* Mobile sidebar (drawer) */}
+      <div className={`fixed inset-0 z-40 lg:hidden transition-opacity ${mobileOpen ? "pointer-events-auto" : "pointer-events-none"}`}>
+        <div
+          className={`absolute inset-0 bg-black/40 transition-opacity ${mobileOpen ? "opacity-100" : "opacity-0"}`}
+          onClick={() => setMobileOpen(false)}
+        />
+        <aside className={`absolute left-0 top-0 bottom-0 w-64 bg-white shadow-lg transform transition-transform ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
+          <div className="px-6 py-5 border-b flex items-center gap-3">
+            <div className="w-10 h-10 bg-[#2563EB] rounded-lg flex items-center justify-center text-white font-bold">QR</div>
+            <div>
+              <div className="text-lg font-semibold">PresensiQR</div>
+              <div className="text-xs text-slate-500">Admin</div>
+            </div>
+          </div>
+
+          <nav className="px-3 py-4 space-y-1">
+            <NavItem to="/admin/dashboard" exact>Dashboard</NavItem>
+            <div className="text-xs text-slate-400 px-3 mt-4 mb-2">Master Data</div>
+            <NavItem to="/admin/mahasiswa">Mahasiswa</NavItem>
+            <NavItem to="/admin/sesi">Kelola Sesi</NavItem>
+            <NavItem to="/admin/rekap">Rekap Kehadiran</NavItem>
+          </nav>
+
+          <div className="p-4 border-t">
+            <div className="flex items-center gap-3">
+              <img src={user?.avatar || "https://placehold.co/40x40"} alt="avatar" className="w-10 h-10 rounded-full" />
+              <div>
+                <div className="text-sm font-medium truncate">{user?.name || "Admin"}</div>
+                <div className="text-xs text-slate-500 truncate">{user?.member?.npm || user?.email}</div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => { setMobileOpen(false); onLogout && onLogout(); }}
+              className="mt-4 w-full text-left px-3 py-2 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700"
+            >
+              Logout
+            </button>
+          </div>
+        </aside>
+      </div>
+
+      {/* Main area */}
+      <div className="flex-1 flex flex-col min-h-screen">
+        {/* Topbar */}
+        <header className="h-16 bg-white border-b flex items-center justify-between px-4 lg:px-6">
+          <div className="flex items-center gap-4">
+            {/* Mobile menu toggle */}
+            <button className="lg:hidden p-2 rounded-md hover:bg-slate-100" onClick={() => setMobileOpen(true)} aria-label="Open menu">
+              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h16M4 12h16M4 18h16" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+
+            <div className="text-lg font-semibold">{title}</div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-slate-600 hidden sm:block">Hi, {user?.name || "Admin"}</div>
+            <img src={user?.avatar || "https://placehold.co/40x40"} alt="avatar" className="w-9 h-9 rounded-full" />
+          </div>
+        </header>
+
+        {/* Content */}
+        <main className="p-4 lg:p-6 overflow-auto">
+          <Outlet />
+        </main>
+
+        <footer className="bg-white border-t p-4 text-xs text-slate-500">
+          © 2025 PresensiQR — Sistem Presensi QR Code
+        </footer>
       </div>
     </div>
   );
