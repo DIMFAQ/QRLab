@@ -72,14 +72,6 @@ export default function AdminPasswordResets() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">
-          Password Reset Approval
-        </h1>
-        <p className="text-gray-600">
-          Setujui atau tolak permintaan reset password dari user
-        </p>
-      </div>
 
       {successMsg && (
         <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">

@@ -8,7 +8,7 @@ export default function AdminRekapAbsensi() {
   
   const [selectedCourse, setSelectedCourse] = useState("");
   const [selectedClass, setSelectedClass] = useState("");
-  const [selectedMeeting, setSelectedMeeting] = useState(null);
+  const [selectedMeeting, setSelectedMeeting] = useState("");
   
   const [attendances, setAttendances] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,14 +28,6 @@ export default function AdminRekapAbsensi() {
         setCourses(coursesRes.data || []);
         setClasses(classesRes.data || []);
         setMeetings(meetingsRes.data || []);
-        
-        // Set default values
-        if (coursesRes.data.length > 0) {
-          setSelectedCourse(coursesRes.data[0].id);
-        }
-        if (classesRes.data.length > 0) {
-          setSelectedClass(classesRes.data[0].id);
-        }
       } catch (e) {
         console.error(e);
       }
@@ -46,19 +38,22 @@ export default function AdminRekapAbsensi() {
 
   // Filter meetings based on selected course and class
   const filteredMeetings = meetings.filter(m => {
-    const matchCourse = !selectedCourse || m.course_id === Number(selectedCourse);
-    const matchClass = !selectedClass || m.class_id === Number(selectedClass);
-    return matchCourse && matchClass;
+    if (!selectedCourse || !selectedClass) return false;
+    return m.course_id === Number(selectedCourse) && m.class_id === Number(selectedClass);
   });
 
-  // Set default meeting when filters change
+  // Reset kelas dan pertemuan saat praktikum berubah
   useEffect(() => {
-    if (filteredMeetings.length > 0 && !filteredMeetings.find(m => m.id === selectedMeeting)) {
-      setSelectedMeeting(filteredMeetings[0].id);
-    } else if (filteredMeetings.length === 0) {
-      setSelectedMeeting(null);
-    }
-  }, [filteredMeetings, selectedMeeting]);
+    setSelectedClass("");
+    setSelectedMeeting("");
+    setAttendances([]);
+  }, [selectedCourse]);
+
+  // Reset pertemuan saat kelas berubah
+  useEffect(() => {
+    setSelectedMeeting("");
+    setAttendances([]);
+  }, [selectedClass]);
 
   // Load rekap attendance saat meeting dipilih
   const loadRekap = async (meetingId) => {
@@ -87,7 +82,7 @@ export default function AdminRekapAbsensi() {
       return;
     }
 
-    const selectedMeetingData = meetings.find(m => m.id === selectedMeeting);
+    const selectedMeetingData = meetings.find(m => m.id === Number(selectedMeeting));
     const csvContent = [
       ["NPM", "NAMA", "WAKTU SCAN", "STATUS"],
       ...attendances.map(a => [
@@ -107,17 +102,15 @@ export default function AdminRekapAbsensi() {
   };
 
   const getStatusBadge = (attendance) => {
-    // Logika status bisa disesuaikan
     if (!attendance.checked_in_at) {
       return { text: "Alpa", bg: "bg-red-100", color: "text-red-700" };
     }
     
-    // Cek jika terlambat (contoh: lebih dari 15 menit dari start_time)
-    const meeting = meetings.find(m => m.id === selectedMeeting);
+    const meeting = meetings.find(m => m.id === Number(selectedMeeting));
     if (meeting && meeting.start_time) {
       const startTime = new Date(meeting.start_time);
       const checkInTime = new Date(attendance.checked_in_at);
-      const diff = (checkInTime - startTime) / (1000 * 60); // dalam menit
+      const diff = (checkInTime - startTime) / (1000 * 60);
       
       if (diff > 15) {
         return { text: "Terlambat", bg: "bg-yellow-100", color: "text-yellow-700" };
@@ -127,14 +120,12 @@ export default function AdminRekapAbsensi() {
     return { text: "Hadir", bg: "bg-green-100", color: "text-green-700" };
   };
 
-  const selectedMeetingData = meetings.find(m => m.id === selectedMeeting);
+  const selectedMeetingData = meetings.find(m => m.id === Number(selectedMeeting));
 
   return (
     <div className="space-y-6">
       {/* Filter Section */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-        <h3 className="text-2xl font-bold text-slate-800 mb-6">Filter Rekap Absensi</h3>
-        
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-2">Praktikum</label>
@@ -144,7 +135,7 @@ export default function AdminRekapAbsensi() {
               className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700"
               disabled={loading}
             >
-              <option value="">Semua Praktikum</option>
+              <option value="">Pilih Praktikum</option>
               {courses.map((course) => (
                 <option key={course.id} value={course.id}>
                   {course.code} - {course.name}
@@ -158,13 +149,15 @@ export default function AdminRekapAbsensi() {
             <select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700"
-              disabled={loading}
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 disabled:bg-slate-100 disabled:cursor-not-allowed"
+              disabled={loading || !selectedCourse}
             >
-              <option value="">Semua Kelas</option>
+              <option value="">
+                {!selectedCourse ? "Pilih praktikum dulu" : "Pilih Kelas"}
+              </option>
               {classes.map((cls) => (
                 <option key={cls.id} value={cls.id}>
-                  Kelas {cls.name}
+                  {cls.name}
                 </option>
               ))}
             </select>
@@ -173,30 +166,29 @@ export default function AdminRekapAbsensi() {
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-2">Pertemuan</label>
             <select
-              value={selectedMeeting || ""}
-              onChange={(e) => setSelectedMeeting(Number(e.target.value))}
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700"
-              disabled={loading || filteredMeetings.length === 0}
+              value={selectedMeeting}
+              onChange={(e) => setSelectedMeeting(e.target.value)}
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 disabled:bg-slate-100 disabled:cursor-not-allowed"
+              disabled={loading || !selectedCourse || !selectedClass || filteredMeetings.length === 0}
             >
-              {filteredMeetings.length === 0 ? (
-                <option value="">
-                  {selectedCourse && selectedClass 
-                    ? "Belum ada pertemuan untuk kelas ini"
-                    : "Pilih praktikum dan kelas terlebih dahulu"}
+              <option value="">
+                {!selectedCourse || !selectedClass
+                  ? "Pilih praktikum & kelas dulu"
+                  : filteredMeetings.length === 0
+                  ? "Tidak ada pertemuan"
+                  : "Pilih Pertemuan"}
+              </option>
+              {filteredMeetings.map((meeting) => (
+                <option key={meeting.id} value={meeting.id}>
+                  Pertemuan {meeting.meeting_number}
                 </option>
-              ) : (
-                filteredMeetings.map((meeting) => (
-                  <option key={meeting.id} value={meeting.id}>
-                    Pertemuan {meeting.meeting_number} - {meeting.course_name || meeting.name}
-                  </option>
-                ))
-              )}
+              ))}
             </select>
           </div>
 
           <button
             onClick={handleTerapkan}
-            disabled={!selectedMeeting || loading || filteredMeetings.length === 0}
+            disabled={!selectedMeeting || loading}
             className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed"
           >
             Terapkan
@@ -204,12 +196,12 @@ export default function AdminRekapAbsensi() {
         </div>
         
         {/* Info message when no meetings available */}
-        {!loading && filteredMeetings.length === 0 && selectedCourse && selectedClass && (
+        {!loading && selectedCourse && selectedClass && filteredMeetings.length === 0 && (
           <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
             <p className="text-sm text-amber-800">
-              💡 <strong>Belum ada pertemuan yang dibuat untuk kombinasi praktikum dan kelas ini.</strong>
+              💡 <strong>Belum ada pertemuan untuk kombinasi praktikum dan kelas ini.</strong>
               <br />
-              Silakan buat pertemuan terlebih dahulu di menu "Kelola Sesi" sebelum melihat rekap absensi.
+              Silakan buat pertemuan terlebih dahulu di menu "Kelola Sesi".
             </p>
           </div>
         )}
@@ -222,7 +214,7 @@ export default function AdminRekapAbsensi() {
             <h3 className="text-2xl font-bold text-slate-800 mb-1">Hasil Rekap</h3>
             {selectedMeetingData && (
               <p className="text-lg text-slate-600">
-                {selectedMeetingData.name}, Pertemuan {selectedMeetingData.meeting_number}
+                Pertemuan {selectedMeetingData.meeting_number}
               </p>
             )}
           </div>

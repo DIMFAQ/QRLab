@@ -32,6 +32,7 @@ export default function AdminKelolaSesi() {
       console.log("Meetings response:", res.data);
       const data = Array.isArray(res.data) ? res.data : [];
       console.log("Meetings array:", data);
+      console.log("First meeting:", data[0]);
       setMeetings(data);
 
       const openSession = data.find((session) => session.is_open);
@@ -139,7 +140,7 @@ export default function AdminKelolaSesi() {
     return start || end ? `${start ?? ""}${end ? ` - ${end}` : ""}`.trim() : "Jadwal belum ditentukan";
   };
 
-  const roomLabel = (meeting) => meeting.room || meeting.ruangan || meeting.location || "Lokasi menyusul";
+  const roomLabel = (meeting) => meeting.room || meeting.ruangan || meeting.location || "";
 
   const parseAverage = (value) => {
     if (typeof value === "number") return value;
@@ -150,12 +151,15 @@ export default function AdminKelolaSesi() {
   const sessionStats = useMemo(() => {
     const totalMeetings = meetings.length;
     const activeSessions = meetings.filter((m) => m.is_open).length;
+    
+    // Hitung rata-rata dari attendance_percentage yang dikirim backend
     const averageAttendance = meetings.length
       ? Math.round(
-          meetings.reduce((total, item) => total + parseAverage(item.average_attendance), 0) /
+          meetings.reduce((total, item) => total + (item.attendance_percentage ?? 0), 0) /
             meetings.length
         )
       : 0;
+    
     const attendanceCount = meetings.reduce((total, item) => total + (item.attendances_count ?? 0), 0);
 
     return [
@@ -173,7 +177,7 @@ export default function AdminKelolaSesi() {
       },
       {
         label: "Rata-rata Kehadiran",
-        value: `${Number.isNaN(averageAttendance) ? 0 : averageAttendance}%`,
+        value: `${averageAttendance}%`,
         description: "Perhitungan dari seluruh sesi",
         accent: "text-blueviolet",
       },
@@ -196,31 +200,21 @@ export default function AdminKelolaSesi() {
   return (
     <div className="space-y-10 font-arimo text-slate-900">
       <section className="rounded-3xl bg-white/95 p-6 shadow-card ring-1 ring-slate-100">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Kelola Sesi Praktikum</p>
-            <h1 className="text-3xl font-bold text-steelblue-200 mt-1">Daftar Sesi Praktikum</h1>
-            <p className="mt-3 text-sm text-slate-500 max-w-2xl">
-              Pantau dan kelola seluruh sesi praktikum, mulai dari membuka QR presensi, memantau kehadiran,
-              hingga melihat rekap lengkap setiap kelas.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={load}
-              className="rounded-2xl border-2 border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-400 transition-colors"
-            >
-              🔄 Segarkan Data
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowCreateModal(true)}
-              className="rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-3 text-base font-bold text-white shadow-xl shadow-blue-500/50 hover:from-blue-700 hover:to-blue-800 hover:shadow-2xl hover:shadow-blue-600/60 transform hover:scale-105 transition-all duration-200"
-            >
-              ➕ Buat Sesi Baru
-            </button>
-          </div>
+        <div className="flex flex-wrap gap-3 justify-end">
+          <button
+            type="button"
+            onClick={load}
+            className="rounded-2xl border-2 border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-400 transition-colors"
+          >
+            🔄 Segarkan Data
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCreateModal(true)}
+            className="rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-3 text-base font-bold text-white shadow-xl shadow-blue-500/50 hover:from-blue-700 hover:to-blue-800 hover:shadow-2xl hover:shadow-blue-600/60 transform hover:scale-105 transition-all duration-200"
+          >
+            ➕ Buat Sesi Baru
+          </button>
         </div>
 
         <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -327,16 +321,13 @@ export default function AdminKelolaSesi() {
                     <div>
                       <p className="text-xs uppercase tracking-[0.2em]">Rata-rata</p>
                       <p className="text-lg font-semibold text-blueviolet">
-                        {(() => {
-                          const avg = parseAverage(meeting.average_attendance);
-                          return Number.isFinite(avg) ? `${avg}%` : "-";
-                        })()}
+                        {meeting.attendance_percentage != null ? `${meeting.attendance_percentage}%` : "-"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-[0.2em]">Kode</p>
-                      <p className="text-lg font-semibold text-orangered">
-                        {meeting.code || meeting.kode || `#${meeting.id}`}
+                      <p className="text-xs uppercase tracking-[0.2em]">Enrolled</p>
+                      <p className="text-lg font-semibold text-slate-600">
+                        {meeting.total_enrolled ?? 0}
                       </p>
                     </div>
                   </div>
@@ -356,13 +347,27 @@ export default function AdminKelolaSesi() {
                         type="button"
                         onClick={() => startMeeting(meeting.id)}
                         disabled={startingId === meeting.id || meeting.is_open}
-                        className="rounded-2xl bg-steelblue-100 px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-steelblue-200 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-2xl px-4 py-2 text-sm font-semibold shadow-md transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                        style={{
+                          backgroundColor: meeting.is_open ? '#6B7280' : '#076BB2',
+                          color: '#FFFFFF',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!meeting.is_open && startingId !== meeting.id) {
+                            e.currentTarget.style.backgroundColor = '#065A94';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!meeting.is_open) {
+                            e.currentTarget.style.backgroundColor = '#076BB2';
+                          }
+                        }}
                       >
                         {meeting.is_open
-                          ? "Sesi Sedang Aktif"
+                          ? "✓ Sesi Sedang Aktif"
                           : startingId === meeting.id
-                          ? "Menyiapkan QR..."
-                          : "Mulai Sesi & Tampilkan QR"}
+                          ? "⏳ Menyiapkan QR..."
+                          : "▶ Mulai Sesi & Tampilkan QR"}
                       </button>
                     )}
 

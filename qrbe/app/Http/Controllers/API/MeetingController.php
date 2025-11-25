@@ -40,6 +40,22 @@ class MeetingController extends Controller
 
         // Format response dengan data course dan class
         $result = $meetings->map(function ($meeting) {
+            // Hitung total mahasiswa yang enrolled di course + class ini
+            $totalEnrolled = \App\Models\Enrollment::where('course_id', $meeting->course_id)
+                ->where('class_id', $meeting->class_id)
+                ->where('is_active', true)
+                ->count();
+            
+            // Hitung mahasiswa unik yang hadir (bukan total attendance)
+            $uniqueAttendees = \App\Models\Attendance::where('meeting_id', $meeting->id)
+                ->distinct('member_id')
+                ->count('member_id');
+            
+            // Hitung persentase kehadiran
+            $attendancePercentage = $totalEnrolled > 0 
+                ? round(($uniqueAttendees / $totalEnrolled) * 100, 1)
+                : 0;
+            
             return [
                 'id' => $meeting->id,
                 'name' => $meeting->name,
@@ -52,7 +68,9 @@ class MeetingController extends Controller
                 'end_time' => $meeting->end_time,
                 'qr_duration_minutes' => $meeting->qr_duration_minutes,
                 'is_open' => $meeting->is_open,
-                'attendances_count' => $meeting->attendances_count,
+                'attendances_count' => $uniqueAttendees, // Mahasiswa unik yang hadir
+                'total_enrolled' => $totalEnrolled, // Total mahasiswa enrolled
+                'attendance_percentage' => $attendancePercentage, // Persentase kehadiran
                 'created_at' => $meeting->created_at,
                 'updated_at' => $meeting->updated_at,
             ];

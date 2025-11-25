@@ -36,9 +36,9 @@ export default function ResetSuccess() {
           className="bg-white rounded-2xl p-7" 
           style={{ boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.30)' }}
         >
-          {/* Success Icon */}
+          {/* Pending Icon */}
           <div className="flex justify-center mb-5">
-            <div className="w-20 h-20 rounded-full bg-[#076BB2] flex items-center justify-center shadow-lg">
+            <div className="w-20 h-20 rounded-full bg-[#FFA500] flex items-center justify-center shadow-lg">
               <svg 
                 className="w-12 h-12 text-white" 
                 fill="none" 
@@ -48,17 +48,22 @@ export default function ResetSuccess() {
                 <path 
                   strokeLinecap="round" 
                   strokeLinejoin="round" 
-                  strokeWidth={3} 
-                  d="M5 13l4 4L19 7"
+                  strokeWidth={2} 
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
             </div>
           </div>
 
           {/* Title */}
-          <h2 className="text-base font-bold text-center text-gray-900 mb-5">
-            Password Berhasil Diubah!
+          <h2 className="text-base font-bold text-center text-gray-900 mb-2">
+            Menunggu Verifikasi Admin
           </h2>
+          
+          {/* Description */}
+          <p className="text-sm text-center text-gray-600 mb-5">
+            Silakan hubungi admin untuk menyetujui perubahan password Anda agar dapat login kembali.
+          </p>
 
           {/* Button */}
           <button

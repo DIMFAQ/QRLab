@@ -58,7 +58,31 @@ class AttendanceController extends Controller
 
         $meetingId = $activeToken->meeting_id;
 
-        // 2️⃣ Cek apakah sudah absen di pertemuan ini
+        // 2️⃣ Cek apakah mahasiswa terdaftar di praktikum/kelas meeting ini (enrollment aktif)
+        $meeting = \App\Models\Meeting::with(['course', 'praktikumClass'])->find($meetingId);
+        
+        if (!$meeting) {
+            return response()->json(['message' => 'Meeting tidak ditemukan.'], 404);
+        }
+
+        $enrollment = \App\Models\Enrollment::where('member_id', $member->id)
+            ->where('course_id', $meeting->course_id)
+            ->where('class_id', $meeting->class_id)
+            ->first();
+
+        if (!$enrollment) {
+            return response()->json([
+                'message' => 'Anda tidak terdaftar di praktikum/kelas ini. Silakan hubungi admin.'
+            ], 403);
+        }
+
+        if (!$enrollment->is_active) {
+            return response()->json([
+                'message' => 'Enrollment Anda tidak aktif. Silakan hubungi admin untuk mengaktifkan kembali.'
+            ], 403);
+        }
+
+        // 3️⃣ Cek apakah sudah absen di pertemuan ini
         $alreadyAttended = \App\Models\Attendance::where('member_id', $member->id)
             ->where('meeting_id', $meetingId)
             ->exists();
@@ -67,7 +91,7 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Anda sudah absen di pertemuan ini.'], 200);
         }
 
-        // 3️⃣ Simpan data absensi
+        // 4️⃣ Simpan data absensi
         \App\Models\Attendance::create([
             'member_id' => $member->id,
             'meeting_id' => $meetingId,

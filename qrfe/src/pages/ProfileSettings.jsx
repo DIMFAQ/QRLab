@@ -115,8 +115,8 @@ const ProfileSettings = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600">
-        <div className="text-white text-xl">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F6FA]">
+        <div className="text-gray-900 text-xl">Loading...</div>
       </div>
     );
   }
@@ -124,43 +124,41 @@ const ProfileSettings = () => {
   const displayPhoto = preview || currentPhoto;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 py-8 px-4">
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen bg-[#F5F6FA] p-6">
+      <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800">Edit Profil</h1>
+            <p className="text-slate-600 mt-1">Kelola informasi dan foto profil Anda</p>
+          </div>
           <button
             onClick={() => navigate(-1)}
-            className="text-white hover:text-gray-200 flex items-center space-x-2"
+            className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-white rounded-lg border border-slate-300 transition"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            <span>Kembali</span>
+            Kembali
           </button>
-          <h1 className="text-2xl font-bold text-white">Edit Profil</h1>
-          <div className="w-20"></div> {/* Spacer for centering */}
         </div>
 
-        {/* Card */}
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
-          {/* Photo Section */}
-          <div className="border-b pb-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 text-center">
-              Foto Profil
-            </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Kolom Kiri - Foto Profil */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-800 mb-4">Foto Profil</h2>
             
-            {/* Photo Display */}
             <div className="flex flex-col items-center space-y-4">
               <div className="relative">
                 {displayPhoto ? (
                   <img
                     src={displayPhoto}
                     alt="Profile"
-                    className="w-32 h-32 rounded-full object-cover border-4 border-blue-500 shadow-lg"
+                    className="w-32 h-32 rounded-full object-cover border-4 border-[#076BB2] shadow-lg"
                   />
                 ) : (
-                  <div className="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center border-4 border-gray-300">
-                    <svg className="w-16 h-16 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                  <div className="w-32 h-32 rounded-full bg-slate-100 flex items-center justify-center border-4 border-slate-300">
+                    <svg className="w-16 h-16 text-slate-400" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                     </svg>
                   </div>
@@ -172,8 +170,7 @@ const ProfileSettings = () => {
                 )}
               </div>
 
-              {/* File Input */}
-              <label className="cursor-pointer bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200">
+              <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 px-4 rounded-lg transition w-full text-center">
                 <input
                   type="file"
                   accept="image/*"
@@ -185,80 +182,90 @@ const ProfileSettings = () => {
               </label>
 
               {selectedFile && (
-                <p className="text-sm text-gray-600">
-                  File dipilih: <span className="font-semibold">{selectedFile.name}</span>
+                <p className="text-sm text-slate-600 text-center break-all">
+                  {selectedFile.name}
                 </p>
               )}
 
-              {/* Action Buttons */}
-              <div className="flex space-x-2 w-full max-w-sm">
-                {selectedFile ? (
-                  <>
-                    <button
-                      onClick={handleUpload}
-                      disabled={uploading}
-                      className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold py-3 px-4 rounded-lg transition duration-200"
-                    >
-                      {uploading ? 'Menyimpan...' : 'Simpan'}
-                    </button>
-                    <button
-                      onClick={handleCancel}
-                      disabled={uploading}
-                      className="flex-1 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white font-semibold py-3 px-4 rounded-lg transition duration-200"
-                    >
-                      Batal
-                    </button>
-                  </>
-                ) : currentPhoto ? (
+              {selectedFile ? (
+                <div className="flex flex-col gap-2 w-full">
                   <button
-                    onClick={handleDelete}
+                    onClick={handleUpload}
                     disabled={uploading}
-                    className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold py-3 px-4 rounded-lg transition duration-200"
+                    className="w-full bg-[#076BB2] hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-2.5 px-4 rounded-lg transition"
                   >
-                    Hapus Foto
+                    {uploading ? 'Menyimpan...' : 'Simpan Foto'}
                   </button>
-                ) : null}
-              </div>
+                  <button
+                    onClick={handleCancel}
+                    disabled={uploading}
+                    className="w-full bg-slate-500 hover:bg-slate-600 disabled:bg-slate-400 text-white font-semibold py-2.5 px-4 rounded-lg transition"
+                  >
+                    Batal
+                  </button>
+                </div>
+              ) : currentPhoto ? (
+                <button
+                  onClick={handleDelete}
+                  disabled={uploading}
+                  className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold py-2.5 px-4 rounded-lg transition"
+                >
+                  Hapus Foto
+                </button>
+              ) : null}
 
-              <p className="text-xs text-gray-500">
-                Format: JPG, JPEG, PNG. Maksimal 2MB
+              <p className="text-xs text-slate-500 text-center">
+                Format: JPG, JPEG, PNG<br />Maksimal 2MB
               </p>
             </div>
           </div>
 
-          {/* Info Section - Read Only */}
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">
-              Informasi Akun
-            </h2>
+          {/* Kolom Kanan - Informasi Akun */}
+          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-800 mb-6">Informasi Akun</h2>
 
-            <div className="space-y-3">
+            <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-600">Nama</label>
-                <p className="mt-1 text-gray-900 font-semibold">{user.name}</p>
+                <label className="block text-sm font-medium text-slate-600 mb-2">Nama Lengkap</label>
+                <div className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-900">
+                  {user.name}
+                </div>
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-600">Email</label>
-                <p className="mt-1 text-gray-900 font-semibold">{user.email}</p>
+                <label className="block text-sm font-medium text-slate-600 mb-2">Email</label>
+                <div className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-900">
+                  {user.email}
+                </div>
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-600">Role</label>
-                <p className="mt-1">
-                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
+                <label className="block text-sm font-medium text-slate-600 mb-2">Role</label>
+                <div className="flex items-center gap-2">
+                  <span className={`inline-block px-4 py-2 rounded-lg font-semibold ${
                     user.role === 'admin' 
-                      ? 'bg-purple-100 text-purple-800' 
-                      : 'bg-blue-100 text-blue-800'
+                      ? 'bg-purple-100 text-purple-700 border border-purple-300' 
+                      : 'bg-blue-100 text-blue-700 border border-blue-300'
                   }`}>
-                    {user.role === 'admin' ? 'Admin' : 'Praktikan'}
+                    {user.role === 'admin' ? 'Administrator' : 'Praktikan'}
                   </span>
-                </p>
+                </div>
               </div>
+
               {user.member && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-600">NPM</label>
-                  <p className="mt-1 text-gray-900 font-semibold">{user.member.student_id}</p>
+                  <label className="block text-sm font-medium text-slate-600 mb-2">NPM</label>
+                  <div className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-900">
+                    {user.member.student_id}
+                  </div>
                 </div>
               )}
+
+              <div className="pt-4 border-t border-slate-200">
+                <p className="text-sm text-slate-500">
+                  <strong>Catatan:</strong> Untuk mengubah nama, email, atau NPM, silakan hubungi administrator sistem.
+                </p>
+              </div>
             </div>
           </div>
         </div>

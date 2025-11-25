@@ -90,6 +90,9 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'is_admin'])->group(function
     // === RUTE ENROLLMENT (Kelola Pendaftaran Mahasiswa ke Praktikum-Kelas) ===
     Route::get('/enrollments', [EnrollmentController::class, 'index']);
     Route::post('/enrollments', [EnrollmentController::class, 'store']);
+    Route::post('/enrollments/bulk', [EnrollmentController::class, 'bulkStore']); // Bulk enrollment (many students → 1 course + 1 class)
+    Route::post('/enrollments/bulk-advanced', [EnrollmentController::class, 'bulkStoreAdvanced']); // Advanced bulk (many students → many courses × many classes)
+    Route::patch('/enrollments/{id}', [EnrollmentController::class, 'update']); // Update enrollment (toggle status)
     Route::delete('/enrollments/{id}', [EnrollmentController::class, 'destroy']);
     Route::get('/members/{memberId}/enrollments', [EnrollmentController::class, 'getMemberEnrollments']);
 });

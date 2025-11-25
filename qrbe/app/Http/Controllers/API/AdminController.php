@@ -281,8 +281,10 @@ class AdminController extends Controller
               ->whereNotNull('email_verified_at');
         })->count();
 
-        // Absensi hari ini (gunakan checked_in_at sesuai struktur tabel)
-        $hadir_hari_ini = Attendance::whereDate('checked_in_at', Carbon::today())->count();
+        // Absensi hari ini - hitung MAHASISWA UNIK yang hadir (bukan total kehadiran)
+        $hadir_hari_ini = Attendance::whereDate('checked_in_at', Carbon::today())
+            ->distinct('member_id')
+            ->count('member_id');
 
         // Sesi aktif (meeting yang sedang berlangsung)
         $sesi_aktif = Meeting::where('is_open', true)->count();
@@ -320,8 +322,10 @@ class AdminController extends Controller
             // Label hari (format: Sen, Sel, Rab, dll)
             $labels[] = $date->locale('id')->isoFormat('ddd');
             
-            // Hitung kehadiran per hari (gunakan checked_in_at sesuai struktur tabel)
-            $hadirCount = Attendance::whereDate('checked_in_at', $date)->count();
+            // Hitung jumlah MAHASISWA UNIK yang hadir per hari (bukan total kehadiran)
+            $hadirCount = Attendance::whereDate('checked_in_at', $date)
+                ->distinct('member_id')
+                ->count('member_id');
             $hadir[] = $hadirCount;
             
             // Total tetap menggunakan total mahasiswa saat ini

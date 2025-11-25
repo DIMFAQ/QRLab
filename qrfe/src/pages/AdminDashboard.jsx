@@ -82,9 +82,9 @@ export default function AdminDashboard() {
     {
       label: "Absensi Hari Ini",
       value: stats.hadir_hari_ini,
-      color: "teal",
-      bgColor: "bg-teal-100",
-      textColor: "text-teal-600",
+      color: "blue",
+      bgColor: "bg-blue-100",
+      textColor: "text-[#076BB2]",
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -205,9 +205,9 @@ export default function AdminDashboard() {
               key={menu.label}
               type="button"
               onClick={menu.onClick}
-              className="bg-white rounded-2xl border-2 border-slate-200 p-6 hover:border-teal-500 hover:shadow-lg transition-all text-center group"
+              className="bg-white rounded-2xl border-2 border-slate-200 p-6 hover:border-[#076BB2] hover:shadow-lg transition-all text-center group"
             >
-              <div className="text-teal-600 mb-4 flex justify-center group-hover:scale-110 transition-transform">
+              <div className="text-[#076BB2] mb-4 flex justify-center group-hover:scale-110 transition-transform">
                 {menu.icon}
               </div>
               <p className="text-base font-semibold text-slate-800 mb-2">{menu.label}</p>
@@ -229,7 +229,7 @@ export default function AdminDashboard() {
         {loading ? (
           <div className="flex h-64 items-center justify-center text-slate-400">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderBottomColor: '#076BB2' }}></div>
               <p>Memuat data...</p>
             </div>
           </div>
@@ -249,8 +249,8 @@ export default function AdminDashboard() {
                         style={{ height: `${Math.min(totalHeight, 100)}%` }}
                       />
                       <div
-                        className="absolute bottom-0 w-10 rounded-t-lg bg-teal-600"
-                        style={{ height: `${Math.min(hadirHeight, 100)}%` }}
+                        className="absolute bottom-0 w-10 rounded-t-lg"
+                        style={{ height: `${Math.min(hadirHeight, 100)}%`, backgroundColor: '#076BB2' }}
                       />
                     </div>
                     <p className="text-xs font-medium text-slate-700">{item.label}</p>
@@ -262,7 +262,7 @@ export default function AdminDashboard() {
 
             <div className="flex items-center justify-center gap-6 text-xs text-slate-600 mb-6">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-sm bg-teal-600"></div>
+                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#076BB2' }}></div>
                 <span>Mahasiswa Hadir</span>
               </div>
               <div className="flex items-center gap-2">

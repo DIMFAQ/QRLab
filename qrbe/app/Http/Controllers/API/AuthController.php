@@ -59,15 +59,30 @@ class AuthController extends Controller
         /** @var \App\Models\User $user */
         $user = User::where('email', $credentials['email'])->first();
 
-        if (! $user || ! Hash::check($credentials['password'], $user->password)) {
+        if (! $user) {
             return response()->json(['message' => 'Kredensial salah.'], 422);
         }
 
         // Cek apakah ada password reset pending
         if ($user->password_reset_pending) {
+            // Jika ada temp_password, cek juga dengan password baru
+            $passwordMatch = Hash::check($credentials['password'], $user->password);
+            if ($user->temp_password) {
+                $passwordMatch = $passwordMatch || Hash::check($credentials['password'], $user->temp_password);
+            }
+
+            if (!$passwordMatch) {
+                return response()->json(['message' => 'Kredensial salah.'], 422);
+            }
+
             return response()->json([
                 'message' => 'Password reset sedang menunggu persetujuan admin. Silakan hubungi admin untuk mengaktifkan akun Anda.'
             ], 403);
+        }
+
+        // Cek password untuk user yang tidak pending
+        if (! Hash::check($credentials['password'], $user->password)) {
+            return response()->json(['message' => 'Kredensial salah.'], 422);
         }
 
         // --- INI PERBAIKANNYA ---
@@ -242,11 +257,11 @@ class AuthController extends Controller
         $user->password = $user->temp_password;
         $user->temp_password = null;
         $user->password_reset_pending = false;
-        $user->email_verified_at = now(); // Verifikasi email juga sekaligus
+        $user->email_verified_at = now(); // Aktifkan kembali akun agar bisa login
         $user->save();
 
         return response()->json([
-            'message' => 'Password reset berhasil disetujui. User dapat login sekarang.'
+            'message' => 'Password reset disetujui. Akun user telah diaktifkan dan dapat login dengan password baru.'
         ]);
     }
 
@@ -268,13 +283,14 @@ class AuthController extends Controller
             return response()->json(['message' => 'User tidak memiliki password reset pending.'], 400);
         }
 
-        // Hapus temp_password dan reset flag
+        // Hapus temp_password, reset flag, dan aktifkan kembali akun
         $user->temp_password = null;
         $user->password_reset_pending = false;
+        $user->email_verified_at = now(); // Aktifkan kembali akun agar bisa login dengan password lama
         $user->save();
 
         return response()->json([
-            'message' => 'Password reset ditolak. User tetap menggunakan password lama.'
+            'message' => 'Password reset ditolak. Akun user telah diaktifkan dan dapat login dengan password lama.'
         ]);
     }
 }

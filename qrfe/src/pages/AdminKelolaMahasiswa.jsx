@@ -131,8 +131,6 @@ export default function AdminKelolaMahasiswa() {
 
   return (
     <div className="space-y-8 px-4 py-6 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-2 tracking-tight text-slate-800 drop-shadow-sm">Kelola Mahasiswa</h1>
-
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-3 flex-1">
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-50">
