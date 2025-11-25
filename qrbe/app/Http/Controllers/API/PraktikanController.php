@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\Member;
 use App\Models\Attendance;
+use App\Models\Meeting;
+use App\Models\Enrollment;
 
 class PraktikanController extends Controller
 {
@@ -14,7 +16,11 @@ class PraktikanController extends Controller
     public function me(Request $request)
     {
         $user = $request->user();
-        $member = Member::where('user_id', $user->id)->first();
+        
+        $member = null;
+        if ($user->member_id) {
+            $member = Member::find($user->member_id);
+        }
 
         return response()->json([
             'name' => $user->name,
@@ -53,7 +59,12 @@ class PraktikanController extends Controller
     public function riwayat(Request $request)
     {
         $user = $request->user();
-        $member = Member::where('user_id', $user->id)->first();
+        
+        if (!$user->member_id) {
+            return response()->json([]);
+        }
+        
+        $member = Member::find($user->member_id);
 
         if (!$member) {
             return response()->json([]);
@@ -67,10 +78,269 @@ class PraktikanController extends Controller
             ->map(fn($a) => [
                 'meeting_name' => $a->meeting->name ?? null,
                 'meeting_number' => $a->meeting->meeting_number ?? null,
-                'checked_at' => $a->updated_at,
-                'status' => $a->status ? 'Hadir' : 'Tidak Hadir',
+                'checked_at' => $a->created_at,
+                'status' => 'Hadir',
             ]);
 
         return response()->json($items);
+    }
+
+    // Fungsi untuk getAttendanceHistory dengan summary
+    public function getAttendanceHistory(Request $request)
+    {
+        $user = $request->user();
+        
+        if (!$user->member_id) {
+            return response()->json([
+                'summary' => ['hadir' => 0, 'terlambat' => 0, 'alpa' => 0],
+                'history' => []
+            ]);
+        }
+
+        $member = Member::find($user->member_id);
+
+        if (!$member) {
+            return response()->json([
+                'summary' => ['hadir' => 0, 'terlambat' => 0, 'alpa' => 0],
+                'history' => []
+            ]);
+        }
+
+        // Ambil enrollment mahasiswa untuk filter meeting
+        $enrollments = Enrollment::where('member_id', $member->id)
+            ->where('is_active', true)
+            ->get();
+
+        if ($enrollments->isEmpty()) {
+            return response()->json([
+                'summary' => ['hadir' => 0, 'terlambat' => 0, 'alpa' => 0],
+                'history' => []
+            ]);
+        }
+
+        // Ambil semua meeting_id yang sesuai dengan enrollment
+        $validMeetingIds = [];
+        foreach ($enrollments as $enrollment) {
+            $meetingIds = Meeting::where('course_id', $enrollment->course_id)
+                ->where('class_id', $enrollment->class_id)
+                ->pluck('id')
+                ->toArray();
+            $validMeetingIds = array_merge($validMeetingIds, $meetingIds);
+        }
+
+        // Jika tidak ada meeting yang valid, tetap return empty tapi dengan info
+        if (empty($validMeetingIds)) {
+            return response()->json([
+                'summary' => ['hadir' => 0, 'terlambat' => 0, 'alpa' => 0],
+                'history' => []
+            ]);
+        }
+
+        // Ambil semua meeting yang sudah lewat (end_time < sekarang) dari enrollment
+        $pastMeetings = Meeting::whereIn('id', $validMeetingIds)
+            ->where('end_time', '<', now())
+            ->with(['course:id,code,name', 'praktikumClass:id,code,name'])
+            ->orderBy('start_time', 'desc')
+            ->get();
+
+        // Ambil attendance mahasiswa
+        $attendances = Attendance::where('member_id', $member->id)
+            ->whereIn('meeting_id', $validMeetingIds)
+            ->get()
+            ->keyBy('meeting_id');
+
+        $summary = [
+            'hadir' => 0,
+            'terlambat' => 0,
+            'alpa' => 0,
+        ];
+
+        $history = $pastMeetings->map(function($meeting) use ($attendances, &$summary, $member) {
+            $attendance = $attendances->get($meeting->id);
+            
+            // Tentukan status berdasarkan ada/tidaknya attendance dan waktu check-in
+            $status = 'Alpa';
+            $scannedAt = null;
+            
+            if ($attendance) {
+                $checkedAt = $attendance->created_at;
+                $meetingStart = $meeting->start_time;
+                
+                // Toleransi terlambat: 15 menit setelah start_time
+                $lateThreshold = $meetingStart->copy()->addMinutes(15);
+                
+                if ($checkedAt <= $lateThreshold) {
+                    $status = 'Hadir';
+                    $summary['hadir']++;
+                } else {
+                    $status = 'Terlambat';
+                    $summary['terlambat']++;
+                }
+                
+                $scannedAt = $checkedAt->format('Y-m-d H:i:s');
+            } else {
+                $summary['alpa']++;
+            }
+            
+            return [
+                'id' => $meeting->id,
+                'meeting_name' => $meeting->name,
+                'meeting_number' => $meeting->meeting_number,
+                'course_name' => $meeting->course->name ?? null,
+                'course_code' => $meeting->course->code ?? null,
+                'class_name' => $meeting->praktikumClass->name ?? null,
+                'scanned_at' => $scannedAt,
+                'status' => $status,
+            ];
+        });
+
+        return response()->json([
+            'summary' => $summary,
+            'history' => $history
+        ]);
+    }
+
+    public function getActiveMeetings(Request $request)
+    {
+        $meetings = \App\Models\Meeting::where('is_open', true)->get();
+        return response()->json($meetings);
+    }
+
+    // GET /api/praktikan/jadwal - Lihat jadwal pertemuan sesuai enrollment
+    public function getSchedule(Request $request)
+    {
+        $user = $request->user();
+        
+        \Log::info('getSchedule called', ['user_id' => $user->id, 'member_id' => $user->member_id]);
+        
+        // Cari member berdasarkan member_id di user
+        if (!$user->member_id) {
+            \Log::warning('No member_id for user', ['user_id' => $user->id]);
+            return response()->json([
+                'message' => 'Data mahasiswa tidak ditemukan',
+                'enrollments' => [],
+                'schedules' => []
+            ]);
+        }
+
+        $member = Member::find($user->member_id);
+        
+        if (!$member) {
+            \Log::warning('Member not found', ['member_id' => $user->member_id]);
+            return response()->json([
+                'message' => 'Data mahasiswa tidak ditemukan',
+                'enrollments' => [],
+                'schedules' => []
+            ]);
+        }
+
+        // Ambil semua enrollment mahasiswa
+        $enrollments = Enrollment::where('member_id', $member->id)
+            ->where('is_active', true)
+            ->with(['course', 'praktikumClass'])
+            ->get();
+
+        \Log::info('Enrollments found', ['count' => $enrollments->count()]);
+
+        if ($enrollments->isEmpty()) {
+            \Log::warning('No enrollments for member', ['member_id' => $member->id]);
+            return response()->json([
+                'message' => 'Anda belum terdaftar di praktikum manapun',
+                'enrollments' => [],
+                'schedules' => []
+            ]);
+        }
+
+        // Ambil semua meeting yang sesuai dengan enrollment mahasiswa
+        $schedules = [];
+        
+        \Log::info('Before foreach', [
+            'enrollments_count' => $enrollments->count(),
+            'enrollments_isEmpty' => $enrollments->isEmpty(),
+            'enrollments_class' => get_class($enrollments)
+        ]);
+        
+        foreach ($enrollments as $enrollment) {
+            \Log::info('Processing enrollment', [
+                'course_id' => $enrollment->course_id,
+                'class_id' => $enrollment->class_id
+            ]);
+            
+            $meetings = Meeting::where('course_id', $enrollment->course_id)
+                ->where('class_id', $enrollment->class_id)
+                ->with(['course', 'praktikumClass'])
+                ->orderBy('start_time', 'asc')
+                ->get();
+
+            \Log::info('Meetings found for enrollment', [
+                'course_id' => $enrollment->course_id,
+                'class_id' => $enrollment->class_id,
+                'meetings_count' => $meetings->count()
+            ]);
+
+            foreach ($meetings as $meeting) {
+                // Cek apakah mahasiswa sudah absen
+                $attendance = Attendance::where('member_id', $member->id)
+                    ->where('meeting_id', $meeting->id)
+                    ->first();
+
+                // Hitung status attendance
+                $attendanceStatus = null;
+                if ($attendance) {
+                    $checkedAt = $attendance->created_at;
+                    $meetingStart = $meeting->start_time;
+                    $lateThreshold = $meetingStart->copy()->addMinutes(15);
+                    
+                    if ($checkedAt <= $lateThreshold) {
+                        $attendanceStatus = 'Hadir';
+                    } else {
+                        $attendanceStatus = 'Terlambat';
+                    }
+                }
+
+                \Log::info('Meeting details', [
+                    'meeting_id' => $meeting->id,
+                    'name' => $meeting->name,
+                    'start_time' => $meeting->start_time,
+                    'end_time' => $meeting->end_time,
+                    'is_open' => $meeting->is_open,
+                    'has_attendance' => !!$attendance,
+                    'attendance_status' => $attendanceStatus
+                ]);
+
+                $schedules[] = [
+                    'id' => $meeting->id,
+                    'course_name' => $meeting->course->name,
+                    'course_code' => $meeting->course->code,
+                    'class_name' => $meeting->praktikumClass->name,
+                    'class_code' => $meeting->praktikumClass->code,
+                    'meeting_number' => $meeting->meeting_number,
+                    'name' => $meeting->name,
+                    'start_time' => $meeting->start_time,
+                    'end_time' => $meeting->end_time,
+                    'is_open' => $meeting->is_open,
+                    'has_attended' => $attendance ? true : false,
+                    'attendance_status' => $attendanceStatus,
+                    'attendance_time' => $attendance ? $attendance->created_at : null,
+                ];
+            }
+        }
+
+        \Log::info('Total schedules before sort', ['count' => count($schedules)]);
+
+        // Sort by start_time
+        usort($schedules, function($a, $b) {
+            return strtotime($a['start_time']) - strtotime($b['start_time']);
+        });
+
+        return response()->json([
+            'enrollments' => $enrollments->map(function($e) {
+                return [
+                    'course' => $e->course->code . ' - ' . $e->course->name,
+                    'class' => $e->praktikumClass->name,
+                ];
+            }),
+            'schedules' => $schedules
+        ]);
     }
 }

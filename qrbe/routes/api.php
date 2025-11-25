@@ -7,6 +7,9 @@ use App\Http\Controllers\API\MeetingController;
 use App\Http\Controllers\API\AttendanceController;
 use App\Http\Controllers\API\PraktikanController;
 use App\Http\Controllers\API\AdminController;
+use App\Http\Controllers\API\EnrollmentController;
+use App\Http\Controllers\API\MasterDataController;
+use App\Http\Controllers\API\ProfileController;
 
 /*
 |--------------------------------------------------------------------------
@@ -25,10 +28,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
+    // Rute Profile (Admin & Praktikan)
+    Route::get('/profile', [ProfileController::class, 'show']);
+    Route::put('/profile', [ProfileController::class, 'update']);
+    Route::post('/profile/photo', [ProfileController::class, 'uploadPhoto']);
+    Route::delete('/profile/photo', [ProfileController::class, 'deletePhoto']);
+
 // Rute Praktikan
     Route::post('/praktikan/check-in', [AttendanceController::class, 'checkIn']);
     Route::get('/praktikan/history', [PraktikanController::class, 'getAttendanceHistory']); 
     Route::get('/praktikan/meetings', [PraktikanController::class, 'getActiveMeetings']);
+    Route::get('/praktikan/jadwal', [PraktikanController::class, 'getSchedule']);
+    
+    // Rute tambahan dari QRLab
+    Route::get('/praktikan/me', [PraktikanController::class, 'me']);
+    Route::put('/praktikan/me', [PraktikanController::class, 'update']);
+    Route::get('/praktikan/riwayat', [PraktikanController::class, 'riwayat']);
 });
 
 // Rute Admin (terproteksi + cek role admin)
@@ -53,6 +68,30 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'is_admin'])->group(function
     Route::post('/users', [AdminController::class, 'storePraktikan']);
     Route::put('/users/{id}', [AdminController::class, 'updatePraktikan']);
     Route::delete('/users/{id}', [AdminController::class, 'deleteMahasiswa']);
+
+    // === RUTE STATS DASHBOARD ===
+    Route::get('/stats', [AdminController::class, 'stats']);
+    Route::get('/stats/weekly', [AdminController::class, 'weeklyStats']);
+
+    // === RUTE PASSWORD RESET APPROVAL ===
+    Route::get('/pending-password-resets', [AuthController::class, 'getPendingPasswordResets']);
+    Route::post('/approve-password-reset/{userId}', [AuthController::class, 'approvePasswordReset']);
+    Route::post('/reject-password-reset/{userId}', [AuthController::class, 'rejectPasswordReset']);
+
+    // === RUTE MASTER DATA ===
+    Route::get('/courses', [MasterDataController::class, 'getCourses']);
+    Route::post('/courses', [MasterDataController::class, 'storeCourse']);
+    Route::put('/courses/{id}', [MasterDataController::class, 'updateCourse']);
+    Route::delete('/courses/{id}', [MasterDataController::class, 'deleteCourse']);
+    
+    Route::get('/classes', [MasterDataController::class, 'getClasses']);
+    Route::post('/classes', [MasterDataController::class, 'storeClass']);
+
+    // === RUTE ENROLLMENT (Kelola Pendaftaran Mahasiswa ke Praktikum-Kelas) ===
+    Route::get('/enrollments', [EnrollmentController::class, 'index']);
+    Route::post('/enrollments', [EnrollmentController::class, 'store']);
+    Route::delete('/enrollments/{id}', [EnrollmentController::class, 'destroy']);
+    Route::get('/members/{memberId}/enrollments', [EnrollmentController::class, 'getMemberEnrollments']);
 });
 
 // Rute verifikasi email

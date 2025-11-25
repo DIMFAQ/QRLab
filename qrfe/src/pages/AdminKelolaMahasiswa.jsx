@@ -22,7 +22,6 @@ export default function AdminKelolaMahasiswa() {
   const load = async () => {
     setLoading(true);
     try {
-      // Menambahkan timestamp untuk menghindari cache browser
       const timestamp = `&_t=${new Date().getTime()}`;
       const q = `?search=${encodeURIComponent(searchTerm || "")}&status=${encodeURIComponent(status || "all")}${timestamp}`;
       const res = await api.get(`/admin/users${q}`);
@@ -113,16 +112,14 @@ export default function AdminKelolaMahasiswa() {
         await api.post("/admin/users", payload);
       }
 
+      await load();
       closeModal();
-      
-      // Reset search. useEffect akan memanggil load()
       setSearchTerm(""); 
-      
     } catch (err) {
       if (err.response?.data?.errors) {
         const errorMessages = Object.values(err.response.data.errors)
           .flat()
-          .join(" \n"); // \n akan berfungsi karena whitespace-pre-line
+          .join(" \n");
         setErrorMsg(errorMessages);
       } else {
         setErrorMsg(err.response?.data?.message || err.message || "Terjadi kesalahan");
@@ -133,178 +130,176 @@ export default function AdminKelolaMahasiswa() {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-semibold mb-6">Kelola Mahasiswa</h1>
+    <div className="space-y-8 px-4 py-6 max-w-6xl mx-auto">
+      <h1 className="text-3xl font-bold mb-2 tracking-tight text-slate-800 drop-shadow-sm">Kelola Mahasiswa</h1>
 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-center space-x-3">
-          <div className="flex rounded-lg overflow-hidden border">
+        <div className="flex items-center gap-3 flex-1">
+          <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-50">
             <button
               onClick={() => setStatus("all")}
-              className={`px-4 py-2 ${status === "all" ? "bg-blue-600 text-white" : "bg-white text-gray-700"}`}
+              className={`px-5 py-2 font-semibold transition ${
+                status === "all"
+                  ? "bg-blue-100 text-blue-800"
+                  : "bg-transparent text-gray-600 hover:bg-gray-100"
+              }`}
             >
               Semua
             </button>
             <button
               onClick={() => setStatus("active")}
-              className={`px-4 py-2 ${status === "active" ? "bg-blue-600 text-white" : "bg-white text-gray-700"}`}
+              className={`px-5 py-2 font-semibold transition ${
+                status === "active"
+                  ? "bg-green-100 text-green-700"
+                  : "bg-transparent text-gray-600 hover:bg-gray-100"
+              }`}
             >
               Aktif
             </button>
             <button
               onClick={() => setStatus("pending")}
-              className={`px-4 py-2 ${status === "pending" ? "bg-blue-600 text-white" : "bg-white text-gray-700"}`}
+              className={`px-5 py-2 font-semibold transition ${
+                status === "pending"
+                  ? "bg-yellow-100 text-yellow-700"
+                  : "bg-transparent text-gray-600 hover:bg-gray-100"
+              }`}
             >
-              Menunggu Verifikasi
+              Menunggu Verif
             </button>
           </div>
-
           <input
             type="text"
-            placeholder="Cari mahasiswa (Student ID atau Nama)..."
-            className="border px-4 py-2 rounded-lg shadow-sm w-full max-w-sm"
+            placeholder="Cari mahasiswa (ID/Nama/Email)..."
+            className="ml-3 border border-gray-300 bg-white placeholder-gray-400 px-4 py-2.5 rounded-lg shadow-sm text-base w-full max-w-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 transition"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            spellCheck={false}
           />
         </div>
-
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={openAdd}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-green-700 transition-colors"
-          >
-            Tambah Mahasiswa
-          </button>
-        </div>
+        <button
+          onClick={openAdd}
+          className="bg-blue-600 text-white px-5 py-2.5 rounded-lg shadow-lg hover:bg-blue-700 font-bold tracking-wide transition"
+        >
+          + Tambah Mahasiswa
+        </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      <div className="bg-white rounded-xl shadow-lg overflow-auto">
         {loading ? (
-          <div className="p-6">Memuat...</div>
+          <div className="p-8 text-center text-lg text-gray-400 font-medium">Memuat...</div>
         ) : students.length === 0 ? (
-          <div className="p-6 text-slate-500">Belum ada data mahasiswa.</div>
+          <div className="p-8 text-center text-gray-500">Belum ada data mahasiswa.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {students.map((s) => (
-                  <tr key={s.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">{s.student_id}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{s.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{s.email}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          s.status === "active" ? "bg-green-100 text-green-800" :
-                          s.status === "pending" ? "bg-yellow-100 text-yellow-800" :
-                          "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {s.status === "active" ? "Aktif" : s.status === "pending" ? "Menunggu" : s.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap flex items-center space-x-3">
+          <table className="min-w-full divide-y divide-gray-200 text-base">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Student ID</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Nama</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-100">
+              {students.map((s) => (
+                <tr key={s.id} className="hover:bg-blue-50 transition">
+                  <td className="px-6 py-4 align-top font-mono whitespace-nowrap">{s.student_id}</td>
+                  <td className="px-6 py-4 align-top font-semibold text-slate-800 max-w-xs break-words">{s.name}</td>
+                  <td className="px-6 py-4 align-top text-slate-700 max-w-xs break-all">{s.email}</td>
+                  <td className="px-6 py-4 align-top">
+                    <span className={`px-3 py-1 inline-block text-xs font-semibold rounded-xl shadow-sm ${
+                      s.status === "active" 
+                        ? "bg-green-100 text-green-800" 
+                        : s.status === "pending" 
+                        ? "bg-yellow-100 text-yellow-800"
+                        : "bg-slate-100 text-slate-800"
+                    }`}>
+                      {s.status === "active" ? "Aktif" : s.status === "pending" ? "Menunggu" : s.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 align-top">
+                    <div className="flex gap-2">
                       <button
                         onClick={() => openEdit(s)}
-                        className="text-yellow-500 hover:text-yellow-700"
+                        className="p-2 rounded-full text-yellow-500 hover:bg-yellow-100 hover:text-yellow-700"
                         title="Edit"
                       >
                         <FaEdit />
                       </button>
                       <button
                         onClick={() => remove(s.id)}
-                        className="text-red-500 hover:text-red-700"
+                        className="p-2 rounded-full text-red-500 hover:bg-red-100 hover:text-red-700"
                         title="Hapus"
                       >
                         <FaTrash />
                       </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={closeModal} />
-          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md z-10">
-            <form onSubmit={submitForm} className="p-6 space-y-4">
-              <h2 className="text-xl font-semibold">
-                {editingId ? "Edit Mahasiswa" : "Tambah Mahasiswa"}
-              </h2>
-
-              {/* Menambahkan 'whitespace-pre-line' agar \n berfungsi */}
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-[1.5px]" onClick={closeModal} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10">
+            <form onSubmit={submitForm} className="p-8 space-y-4 animate-fade-in">
+              <h2 className="text-xl font-semibold">{editingId ? "Edit Mahasiswa" : "Tambah Mahasiswa"}</h2>
               {errorMsg && <div className="text-sm text-red-600 whitespace-pre-line">{errorMsg}</div>}
-
               <div>
                 <label className="block text-sm font-medium mb-1">Student ID</label>
                 <input
                   type="text"
                   value={form.student_id}
                   onChange={(e) => handleChange("student_id", e.target.value)}
-                  className="w-full border px-3 py-2 rounded"
+                  className="w-full border border-gray-300 px-3 py-2 rounded-lg"
                   required
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium mb-1">Nama</label>
                 <input
                   type="text"
                   value={form.name}
                   onChange={(e) => handleChange("name", e.target.value)}
-                  className="w-full border px-3 py-2 rounded"
+                  className="w-full border border-gray-300 px-3 py-2 rounded-lg"
                   required
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium mb-1">Email</label>
                 <input
                   type="email"
                   value={form.email}
-                  // [PERBAIKAN] Diubah dari e.g.value menjadi e.target.value
                   onChange={(e) => handleChange("email", e.target.value)}
-                  className="w-full border px-3 py-2 rounded"
+                  className="w-full border border-gray-300 px-3 py-2 rounded-lg"
                   required
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium mb-1">Password (opsional)</label>
                 <input
                   type="password"
                   value={form.password}
                   onChange={(e) => handleChange("password", e.target.value)}
-                  className="w-full border px-3 py-2 rounded"
+                  className="w-full border border-gray-300 px-3 py-2 rounded-lg"
                   placeholder={editingId ? "Isi untuk ganti password" : ""}
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium mb-1">Status</label>
                 <select
                   value={form.status}
                   onChange={(e) => handleChange("status", e.target.value)}
-                  className="w-full border px-3 py-2 rounded"
+                  className="w-full border border-gray-300 px-3 py-2 rounded-lg"
                 >
                   <option value="pending">Menunggu Verifikasi</option>
                   <option value="active">Aktif</option>
                 </select>
               </div>
-
               <div className="flex justify-end space-x-3 pt-2">
                 <button
                   type="button"
@@ -316,7 +311,7 @@ export default function AdminKelolaMahasiswa() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-4 py-2 rounded bg-blue-600 text-white disabled:opacity-60"
+                  className="px-4 py-2 rounded bg-blue-600 text-white font-semibold disabled:opacity-60 transition"
                 >
                   {saving ? "Menyimpan..." : (editingId ? "Update" : "Simpan")}
                 </button>

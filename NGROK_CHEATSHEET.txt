@@ -1,0 +1,64 @@
+# ========================================
+# CARA PAKAI APLIKASI - NGROK (HTTPS)
+# ========================================
+
+## PERSIAPAN AWAL (SEKALI AJA)
+
+1. Login ke ngrok: https://dashboard.ngrok.com/login
+2. Copy authtoken: https://dashboard.ngrok.com/get-started/your-authtoken
+3. Jalankan:
+   C:\Users\Pongo\ngrok\ngrok.exe config add-authtoken PASTE_TOKEN_DISINI
+
+## JALANKAN APLIKASI
+
+cd d:\qrrr
+.\start-ngrok.ps1
+
+Akan muncul 4 terminal:
+- Terminal 1: Backend (Laravel)
+- Terminal 2: Frontend (Vite)
+- Terminal 3: Ngrok Backend
+- Terminal 4: Ngrok Frontend
+
+## UPDATE BACKEND URL
+
+Dari Terminal 3, copy URL HTTPS (contoh: https://abc123.ngrok-free.app)
+
+Lalu jalankan:
+.\update-ngrok-url.ps1 -NgrokUrl 'https://abc123.ngrok-free.app'
+
+## AKSES DARI HP/PC
+
+Dari Terminal 4, copy URL HTTPS (contoh: https://xyz789.ngrok-free.app)
+
+Buka di browser HP/PC:
+https://xyz789.ngrok-free.app
+
+Login:
+Email: mahasiswa1@example.com
+Password: password
+
+## STOP SEMUA
+
+Get-Process -Name php,node,ngrok | Stop-Process -Force
+
+## TROUBLESHOOTING
+
+Error "ERR_NGROK_6022":
+- Ngrok free hanya 1 tunnel
+- Stop semua: Get-Process ngrok | Stop-Process -Force
+- Jalankan ulang
+
+Kamera tidak muncul:
+- Pastikan URL HTTPS (ada gembok)
+- Allow permission kamera
+
+Login gagal:
+- Cek api.js sudah terupdate (.\update-ngrok-url.ps1)
+- Cek Terminal 1 (Backend) tidak ada error
+
+## DOKUMENTASI LENGKAP
+
+PANDUAN_NGROK_LENGKAP.md - Panduan detail step-by-step
+QUICK_START_NGROK.md - Quick reference
+CARA_PAKAI_KAMERA.md - Solusi masalah kamera

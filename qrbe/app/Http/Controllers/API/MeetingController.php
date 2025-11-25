@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Meeting;
 use App\Models\MeetingToken;
 use App\Models\User; // <-- Pastikan ini ada
+use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -18,33 +19,46 @@ class MeetingController extends Controller
      */
     public function index()
     {
-        // Ambil semua meeting, urutkan dari yang terbaru
-        // withCount('attendances') untuk menghitung jumlah hadir
-        $meetings = Meeting::withCount('attendances')
+        // Ambil semua meeting dengan relasi course dan class
+        $meetings = Meeting::with(['course', 'praktikumClass', 'admin'])
+                           ->withCount('attendances')
                            ->orderBy('created_at', 'desc')
                            ->get();
 
         // --- [LOGIKA PENTING UNTUK AUTO-CLOSE] ---
-        // Cek setiap meeting yang statusnya masih 'open'
         foreach ($meetings->where('is_open', true) as $meeting) {
-            
-            // Cek: Apakah ada token aktif (belum kadaluarsa) untuk meeting ini?
-            // Kita cek relasi 'tokens'
             $hasActiveToken = $meeting->tokens()
                                       ->where('expires_at', '>', now())
-                                      ->exists(); //
+                                      ->exists();
 
-            // Jika TIDAK ADA token aktif, tapi status meeting masih 'is_open'
             if (!$hasActiveToken) {
-                // Maka, tutup sesi ini secara otomatis
-                $meeting->is_open = false; //
+                $meeting->is_open = false;
                 $meeting->save();
             }
         }
         // --- Selesai Logika Auto-Close ---
 
-        // Kembalikan data meeting yang sudah di-update
-        return response()->json($meetings);
+        // Format response dengan data course dan class
+        $result = $meetings->map(function ($meeting) {
+            return [
+                'id' => $meeting->id,
+                'name' => $meeting->name,
+                'course_id' => $meeting->course_id,
+                'class_id' => $meeting->class_id,
+                'course_name' => $meeting->course?->name,
+                'class_name' => $meeting->praktikumClass?->name,
+                'meeting_number' => $meeting->meeting_number,
+                'start_time' => $meeting->start_time,
+                'end_time' => $meeting->end_time,
+                'qr_duration_minutes' => $meeting->qr_duration_minutes,
+                'is_open' => $meeting->is_open,
+                'attendances_count' => $meeting->attendances_count,
+                'created_at' => $meeting->created_at,
+                'updated_at' => $meeting->updated_at,
+            ];
+        });
+
+        return response()->json($result);
     }
 
     /**
@@ -53,32 +67,58 @@ class MeetingController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
+        $validated = $request->validate([
+            'course_id' => 'required|exists:courses,id',
+            'class_id' => 'required|exists:classes,id',
             'meeting_number' => 'required|integer|min:1',
             'qr_duration_minutes' => 'required|integer|min:1|max:60',
+            'start_time' => 'required|date',
+            'end_time' => 'required|date|after:start_time',
         ]);
 
+        // VALIDASI: Cek apakah pertemuan dengan course + class + meeting_number sudah ada
+        $existingMeeting = Meeting::where('course_id', $validated['course_id'])
+                                  ->where('class_id', $validated['class_id'])
+                                  ->where('meeting_number', $validated['meeting_number'])
+                                  ->first();
+
+        if ($existingMeeting) {
+            return response()->json([
+                'message' => 'Pertemuan ke-' . $validated['meeting_number'] . ' untuk kelas ini sudah dibuat sebelumnya.',
+                'existing_meeting' => $existingMeeting->name,
+            ], 422);
+        }
+
+        // Ambil data course dan class untuk generate nama meeting
+        $course = \App\Models\Course::findOrFail($validated['course_id']);
+        $class = \App\Models\ClassModel::findOrFail($validated['class_id']);
+        
+        // Generate nama meeting otomatis: "Jaringan Komputer - Kelas A - Pertemuan 1"
+        $meetingName = "{$course->name} - {$class->name} - Pertemuan {$validated['meeting_number']}";
+
+        // Parse waktu dengan timezone Jakarta (GMT+7)
+        $startTime = Carbon::parse($validated['start_time'], 'Asia/Jakarta');
+        $endTime = Carbon::parse($validated['end_time'], 'Asia/Jakarta');
+
         $meeting = Meeting::create([
-            'name' => $request->name,
-            'meeting_number' => $request->meeting_number,
-            'qr_duration_minutes' => $request->qr_duration_minutes,
-            'is_open' => true, // Langsung buka sesinya
+            'name' => $meetingName,
+            'course_id' => $validated['course_id'],
+            'class_id' => $validated['class_id'],
+            'meeting_number' => $validated['meeting_number'],
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+            'qr_duration_minutes' => $validated['qr_duration_minutes'],
+            'is_open' => false, // Meeting dibuat tapi belum dibuka (admin manual start nanti)
             'user_id' => auth()->id(), // Simpan siapa admin yg buat
         ]);
 
-        // Buat QR Token pertama untuk sesi ini
-        $expiry = now()->addMinutes($request->qr_duration_minutes);
-        $token = $meeting->tokens()->create([
-            'token' => Str::random(40),
-            'expires_at' => $expiry, //
-        ]);
+        // TIDAK auto-generate QR token, admin harus manual start sesuai jadwal
 
-        // Kembalikan data QR aktif (sesuai format frontend)
+        // Kembalikan data meeting yang baru dibuat
         return response()->json([
             'meeting_id' => $meeting->id,
-            'qr_token' => $token->token,
-            'expires_at' => $token->expires_at->toDateTimeString(),
+            'meeting_name' => $meetingName,
+            'message' => 'Meeting berhasil dijadwalkan. Klik "Mulai" untuk membuka QR Code saat waktunya tiba.',
         ], 201);
     }
 
@@ -110,6 +150,32 @@ class MeetingController extends Controller
         ], 201);
     }
 
+    /**
+     * Start meeting dan generate QR token pertama kali
+     * POST /api/admin/meetings/{meeting}/qr
+     */
+    public function generateQrToken(Meeting $meeting)
+    {
+        // Set meeting menjadi open
+        $meeting->is_open = true;
+        $meeting->save();
+
+        // Generate QR token baru
+        $duration = $meeting->qr_duration_minutes ?? 5;
+        $expiry = now()->addMinutes($duration);
+
+        $token = $meeting->tokens()->create([
+            'token' => Str::random(40),
+            'expires_at' => $expiry,
+        ]);
+
+        return response()->json([
+            'meeting_id' => $meeting->id,
+            'qr_token' => $token->token,
+            'expires_at' => $token->expires_at->toDateTimeString(),
+            'message' => 'QR Code berhasil dibuat dan sesi dibuka.',
+        ], 201);
+    }
 
     /**
      * Mengambil QR Aktif untuk 1 meeting (Tampilkan QR)
@@ -158,17 +224,19 @@ class MeetingController extends Controller
      */
     public function rekap(Meeting $meeting)
     {
-        // Ambil data absensi, join dengan user, lalu join dengan member
+        // Ambil data absensi dengan relasi member
         $attendances = $meeting->attendances()
-                              ->with(['user.member']) // Eager load user dan member
+                              ->with(['member']) // Eager load member
                               ->get();
 
         $rekap = $attendances->map(function ($att) {
             return [
-                'name' => $att->user->member->name ?? $att->user->name, // Prioritaskan nama member
-                'npm' => $att->user->member->npm ?? 'N/A', //
-                'status' => $att->status, // 'Hadir'
-                'time' => $att->created_at->toTimeString(),
+                'member' => [
+                    'student_id' => $att->member->student_id ?? 'N/A',
+                    'name' => $att->member->name ?? 'N/A',
+                ],
+                'checked_in_at' => $att->checked_in_at,
+                'status' => 'Hadir', // Default status
             ];
         });
 

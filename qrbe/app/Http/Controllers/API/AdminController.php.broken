@@ -1,0 +1,337 @@
+﻿<?php
+
+namespace App\Http\Controllers\API;
+
+use App\Http\Controllers\Controller;
+use App\Models\Meeting;
+use App\Models\QrSession;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
+use App\Models\User;
+
+// Impor yang diperlukan
+use App\Models\Member;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use App\Models\Attendance;
+use Carbon\Carbon;
+
+
+class AdminController extends Controller
+{
+
+    public function getPendingUsers(Request $request)
+    {
+        // Fungsi ini TETAP ADA
+        $pendingUsers = User::where('role', 'praktikan')
+                            ->whereNull('email_verified_at')
+                            ->with('member') 
+                            ->orderBy('created_at', 'asc') 
+                            ->get();
+
+        return response()->json($pendingUsers);
+    }
+
+    public function approveUser(Request $request, $id)
+    {
+        // Fungsi ini TETAP ADA
+        $user = User::find($id);
+
+        if (! $user) {
+            return response()->json(['message' => 'User tidak ditemukan'], 404);
+        }
+
+        if ($user->hasVerifiedEmail()) {
+            return response()->json(['message' => 'User sudah terverifikasi'], 400);
+        }
+
+        $user->email_verified_at = now();
+        $user->save();
+
+        return response()->json(['message' => 'User ' . $user->name . ' berhasil disetujui.']);
+    }
+
+    public function generateGlobalQrToken(Request $request)
+    {
+        // Fungsi ini TETAP ADA
+        QrSession::whereNull('meeting_id')->delete();
+        $token = Str::random(12);
+        $expiry = now()->addMinutes(10); 
+        $qrSession = QrSession::create([
+            'token' => $token,
+            'expires_at' => $expiry,
+            'meeting_id' => null,
+        ]);
+        Cache::put('qr_token_' . $token, 'global', $expiry);
+        return response()->json([
+            'message' => 'Sesi QR Code global berhasil dibuat.',
+            'qr_token' => $qrSession->token,
+            'expires_at' => $qrSession->expires_at->toDateTimeString(),
+        ], 201);
+    }
+
+    public function getActiveGlobalQrToken(Request $request)
+    {
+        // Fungsi ini TETAP ADA
+        $session = QrSession::where('expires_at', '>', now())
+                            ->whereNull('meeting_id')
+                            ->first();
+        if (!$session) {
+            return response()->json(['message' => 'Tidak ada sesi QR yang aktif saat ini.'], 404);
+        }
+        return response()->json([
+            'qr_token' => $session->token,
+            'expires_at' => $session->expires_at->toDateTimeString(),
+            'minutes_left' => now()->diffInMinutes($session->expires_at)
+        ]);
+    }
+    
+    /**
+     * [FUNGSI BARU] Fungsi getMahasiswa (CRUD)
+     */
+    public function getMahasiswa(Request $request)
+    {
+        $searchTerm = $request->query('search');
+        $status = $request->query('status'); 
+
+        $query = Member::with('user')
+            ->whereHas('user', function ($q) {
+                $q->where('role', 'praktikan');
+            });
+
+        if ($status && $status !== 'all') {
+            if ($status === 'pending') {
+                $query->whereHas('user', function ($q) {
+                    $q->whereNull('email_verified_at');
+                });
+            } elseif ($status === 'active') {
+                $query->whereHas('user', function ($q) {
+                    $q->whereNotNull('email_verified_at');
+                });
+            }
+        }
+
+        if ($searchTerm) {
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('student_id', 'like', "%{$searchTerm}%") 
+                  ->orWhere('name', 'like', "%{$searchTerm}%")
+                  ->orWhereHas('user', function ($userQuery) use ($searchTerm) {
+                      $userQuery->where('name', 'like', "%{$searchTerm}%");
+                  });
+            });
+        }
+
+        $members = $query->orderBy('created_at', 'desc')->get();
+
+        $mahasiswa = $members->map(function ($member) {
+            return [
+                'id' => $member->id,
+                'student_id' => $member->student_id, 
+                'name' => $member->user->name, 
+                'email' => $member->user->email,
+                'status' => $member->user->email_verified_at ? 'active' : 'pending'
+            ];
+        });
+
+        return response()->json($mahasiswa);
+    }
+
+    /**
+     * [FUNGSI BARU] Fungsi storePraktikan (CRUD)
+     */
+    public function storePraktikan(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'student_id' => 'required|string|unique:members,student_id', 
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email',
+            'password' => 'nullable|string|min:6', 
+            'status' => 'required|string|in:pending,active',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Validasi gagal', 'errors' => $validator->errors()], 422);
+        }
+
+        $data = $validator->validated();
+
+        try {
+            DB::beginTransaction();
+
+            $member = Member::create([
+                'student_id' => $data['student_id'],
+                'name' => $data['name'],
+            ]);
+
+            User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => $data['password'] ? Hash::make($data['password']) : Hash::make(Str::random(10)),
+                'role' => 'praktikan',
+                'member_id' => $member->id,
+                'email_verified_at' => $data['status'] === 'active' ? now() : null,
+            ]);
+
+            DB::commit(); 
+
+            return response()->json(['message' => 'Mahasiswa berhasil ditambahkan'], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack(); 
+            return response()->json(['message' => 'Gagal menambahkan mahasiswa: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * [FUNGSI BARU] Fungsi updatePraktikan (CRUD)
+     */
+    public function updatePraktikan(Request $request, $id)
+    {
+        $member = Member::with('user')->find($id);
+
+        if (!$member || !$member->user) {
+            return response()->json(['message' => 'Data mahasiswa tidak ditemukan'], 404);
+        }
+        
+        $user = $member->user;
+
+        $validator = Validator::make($request->all(), [
+            'student_id' => [
+                'required',
+                'string',
+                Rule::unique('members')->ignore($member->id),
+            ],
+            'name' => 'required|string|max:255',
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                Rule::unique('users')->ignore($user->id),
+            ],
+            'password' => 'nullable|string|min:6', 
+            'status' => 'required|string|in:pending,active',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Validasi gagal', 'errors' => $validator->errors()], 422);
+        }
+
+        $data = $validator->validated();
+
+        try {
+            DB::beginTransaction();
+
+            $user->name = $data['name'];
+            $user->email = $data['email'];
+            $user->email_verified_at = $data['status'] === 'active' ? now() : null;
+
+            if (!empty($data['password'])) {
+                $user->password = Hash::make($data['password']);
+            }
+            $user->save();
+
+            $member->student_id = $data['student_id'];
+            $member->name = $data['name']; // <--- Perbaikan error NOT NULL
+            $member->save();
+
+            DB::commit(); 
+
+            return response()->json(['message' => 'Data mahasiswa berhasil diperbarui']);
+
+        } catch (\Exception $e) {
+            DB::rollBack(); 
+            return response()->json(['message' => 'Gagal memperbarui data: ' . $e->getMessage()], 500);
+        }
+    }
+
+
+    /**
+     * [FUNGSI BARU] Fungsi deleteMahasiswa (CRUD)
+     */
+    public function deleteMahasiswa($id) 
+    {
+        $member = Member::find($id);
+
+        if (!$member) {
+            return response()->json(['message' => 'Mahasiswa tidak ditemukan'], 404);
+        }
+
+        if ($member->user) {
+            $member->user->delete(); 
+        }
+        $member->delete(); 
+
+        return response()->json(['message' => 'Mahasiswa berhasil dihapus']);
+    }
+
+
+    /**
+     * Get dashboard statistics
+     */
+    public function stats()
+    {
+        // Total mahasiswa aktif
+        $mahasiswa = Member::whereHas('user', function ($q) {
+            $q->where('role', 'praktikan')
+              ->whereNotNull('email_verified_at');
+        })->count();
+
+        // Absensi hari ini
+        $hadir_hari_ini = Attendance::whereDate('created_at', Carbon::today())->count();
+
+        // Sesi aktif (meeting yang sedang berlangsung)
+        $sesi_aktif = Meeting::where('status', 'open')->count();
+
+        // Total pertemuan/jadwal
+        $pertemuan = Meeting::count();
+
+        return response()->json([
+            'mahasiswa' => $mahasiswa,
+            'hadir_hari_ini' => $hadir_hari_ini,
+            'sesi_aktif' => $sesi_aktif,
+            'pertemuan' => $pertemuan,
+        ]);
+    }
+
+    /**
+     * Get weekly attendance statistics
+     */
+    public function weeklyStats()
+    {
+        // Ambil 7 hari terakhir
+        $labels = [];
+        $hadir = [];
+        $total = [];
+
+        // Total mahasiswa aktif
+        $totalMahasiswa = Member::whereHas('user', function ($q) {
+            $q->where('role', 'praktikan')
+              ->whereNotNull('email_verified_at');
+        })->count();
+
+        for ($i = 6; $i >= 0; $i--) {
+            $date = Carbon::today()->subDays($i);
+            
+            // Label hari (format: Sen, Sel, Rab, dll)
+            $labels[] = $date->locale('id')->isoFormat('ddd');
+            
+            // Hitung kehadiran per hari
+            $hadirCount = Attendance::whereDate('created_at', $date)->count();
+            $hadir[] = $hadirCount;
+            
+            // Total tetap menggunakan total mahasiswa saat ini
+            $total[] = $totalMahasiswa;
+        }
+
+        return response()->json([
+            'labels' => $labels,
+            'hadir' => $hadir,
+            'total' => $total,
+        ]);
+    }
+
+}

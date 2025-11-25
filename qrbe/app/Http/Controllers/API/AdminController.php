@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use App\Models\Attendance;
+use Carbon\Carbon;
 
 
 class AdminController extends Controller
@@ -159,18 +161,20 @@ class AdminController extends Controller
         try {
             DB::beginTransaction();
 
-            $user = User::create([
+            // Buat member dulu
+            $member = Member::create([
+                'student_id' => $data['student_id'],
+                'name' => $data['name']
+            ]);
+
+            // Baru buat user dengan member_id
+            User::create([
                 'name' => $data['name'],
                 'email' => $data['email'],
                 'password' => $data['password'] ? Hash::make($data['password']) : Hash::make(Str::random(10)),
                 'role' => 'praktikan',
+                'member_id' => $member->id,
                 'email_verified_at' => $data['status'] === 'active' ? now() : null,
-            ]);
-
-            Member::create([
-                'user_id' => $user->id,
-                'student_id' => $data['student_id'],
-                'name' => $data['name'] // <--- Perbaikan error NOT NULL
             ]);
 
             DB::commit(); 
@@ -261,9 +265,74 @@ class AdminController extends Controller
         if ($member->user) {
             $member->user->delete(); 
         }
-        $member->delete(); 
+        $member->delete();
 
         return response()->json(['message' => 'Mahasiswa berhasil dihapus']);
+    }
+
+    /**
+     * Get dashboard statistics
+     */
+    public function stats()
+    {
+        // Total mahasiswa aktif
+        $mahasiswa = Member::whereHas('user', function ($q) {
+            $q->where('role', 'praktikan')
+              ->whereNotNull('email_verified_at');
+        })->count();
+
+        // Absensi hari ini (gunakan checked_in_at sesuai struktur tabel)
+        $hadir_hari_ini = Attendance::whereDate('checked_in_at', Carbon::today())->count();
+
+        // Sesi aktif (meeting yang sedang berlangsung)
+        $sesi_aktif = Meeting::where('is_open', true)->count();
+
+        // Total pertemuan/jadwal
+        $pertemuan = Meeting::count();
+
+        return response()->json([
+            'mahasiswa' => $mahasiswa,
+            'hadir_hari_ini' => $hadir_hari_ini,
+            'sesi_aktif' => $sesi_aktif,
+            'pertemuan' => $pertemuan,
+        ]);
+    }
+
+    /**
+     * Get weekly attendance statistics
+     */
+    public function weeklyStats()
+    {
+        // Ambil 7 hari terakhir
+        $labels = [];
+        $hadir = [];
+        $total = [];
+
+        // Total mahasiswa aktif
+        $totalMahasiswa = Member::whereHas('user', function ($q) {
+            $q->where('role', 'praktikan')
+              ->whereNotNull('email_verified_at');
+        })->count();
+
+        for ($i = 6; $i >= 0; $i--) {
+            $date = Carbon::today()->subDays($i);
+            
+            // Label hari (format: Sen, Sel, Rab, dll)
+            $labels[] = $date->locale('id')->isoFormat('ddd');
+            
+            // Hitung kehadiran per hari (gunakan checked_in_at sesuai struktur tabel)
+            $hadirCount = Attendance::whereDate('checked_in_at', $date)->count();
+            $hadir[] = $hadirCount;
+            
+            // Total tetap menggunakan total mahasiswa saat ini
+            $total[] = $totalMahasiswa;
+        }
+
+        return response()->json([
+            'labels' => $labels,
+            'hadir' => $hadir,
+            'total' => $total,
+        ]);
     }
 
 }

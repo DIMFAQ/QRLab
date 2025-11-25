@@ -1,0 +1,339 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../api";
+
+const numberFormatter = new Intl.NumberFormat("id-ID");
+
+const formatNumber = (value) => {
+  if (value === null || value === undefined) {
+    return "0";
+  }
+  return numberFormatter.format(value);
+};
+
+export default function AdminDashboard() {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    mahasiswa: 0,
+    hadir_hari_ini: 0,
+    sesi_aktif: 0,
+    pertemuan: 0,
+  });
+  const [weekly, setWeekly] = useState({
+    labels: [],
+    hadir: [],
+    total: [],
+  });
+
+  useEffect(() => {
+    const loadDashboard = async () => {
+      setLoading(true);
+
+      try {
+        const s = await api.get("/admin/stats");
+        setStats((prev) => ({ ...prev, ...s.data }));
+      } catch (error) {
+        console.log("Stats error:", error);
+      }
+
+      try {
+        const w = await api.get("/admin/stats/weekly");
+        if (w.data) {
+          setWeekly(w.data);
+        }
+      } catch (error) {
+        console.log("Weekly error:", error);
+      }
+
+      try {
+        const u = await api.get("/admin/users");
+        const count = Array.isArray(u.data) ? u.data.length : u.data?.total ?? 0;
+        setStats((prev) => ({ ...prev, mahasiswa: count }));
+      } catch (error) {
+        console.log("Mahasiswa count error:", error);
+      }
+
+      setLoading(false);
+    };
+
+    loadDashboard();
+  }, []);
+
+  const totalWeeklyAttendance = weekly.hadir?.reduce((a, b) => a + b, 0) || 0;
+  const totalWeeklySlots = weekly.total?.reduce((a, b) => a + b, 0) || 0;
+  const avgAttendancePercent = totalWeeklySlots > 0
+    ? Math.round((totalWeeklyAttendance / totalWeeklySlots) * 100)
+    : 0;
+
+  const highestAttendanceDay = (() => {
+    if (!weekly.hadir || weekly.hadir.length === 0) return "-";
+    const max = Math.max(...weekly.hadir);
+    const idx = weekly.hadir.indexOf(max);
+    return weekly.labels?.[idx] ?? "-";
+  })();
+
+  const statCards = [
+    {
+      label: "Total Mahasiswa",
+      value: stats.mahasiswa,
+      desc: "Mahasiswa terdaftar",
+      color: "blue",
+      bgColor: "bg-blue-100",
+      textColor: "text-blue-600",
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+        </svg>
+      ),
+    },
+    {
+      label: "Absensi Hari Ini",
+      value: stats.hadir_hari_ini,
+      desc: "Mahasiswa hadir",
+      color: "teal",
+      bgColor: "bg-teal-100",
+      textColor: "text-teal-600",
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+      ),
+    },
+    {
+      label: "Sesi Aktif",
+      value: stats.sesi_aktif,
+      desc: "Sesi berlangsung",
+      color: "purple",
+      bgColor: "bg-purple-100",
+      textColor: "text-purple-600",
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+      ),
+    },
+    {
+      label: "Total_Jadwal",
+      value: stats.pertemuan,
+      desc: "Jadwal pertemuan",
+      color: "orange",
+      bgColor: "bg-orange-100",
+      textColor: "text-orange-600",
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+        </svg>
+      ),
+    },
+  ];
+
+  const quickMenus = [
+    {
+      label: "Manajemen Mahasiswa",
+      desc: "Kelola data dan registrasi mahasiswa",
+      icon: (
+        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+        </svg>
+      ),
+      onClick: () => navigate("/admin/mahasiswa"),
+    },
+    {
+      label: "Kelola Sesi",
+      desc: "Buat sesi absensi baru",
+      icon: (
+        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+        </svg>
+      ),
+      onClick: () => navigate("/admin/sesi"),
+    },
+    {
+      label: "Rekap Absensi",
+      desc: "Lihat laporan kehadiran",
+      icon: (
+        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+        </svg>
+      ),
+      onClick: () => navigate("/admin/rekap"),
+    },
+  ];
+
+  const chartData = useMemo(() => {
+    if (!weekly.labels?.length) {
+      return [];
+    }
+
+    return weekly.labels.map((label, idx) => ({
+      label,
+      hadir: weekly.hadir?.[idx] ?? 0,
+      total: weekly.total?.[idx] ?? (stats.mahasiswa || 0),
+    }));
+  }, [stats.mahasiswa, weekly.hadir, weekly.labels, weekly.total]);
+
+  const chartMaxValues = chartData.map((item) => Math.max(item.total, item.hadir));
+  const safeMaxChartValue = chartMaxValues.length
+    ? Math.max(...chartMaxValues, 1)
+    : Math.max(stats.mahasiswa || 0, 1);
+
+  const summaryCards = [
+    {
+      label: "Rata-rata Kehadiran",
+      value: loading ? "..." : `${avgAttendancePercent}%`,
+      desc: "Berdasarkan sesi minggu ini",
+      accent: "text-steelblue-100",
+    },
+    {
+      label: "Total Kehadiran Minggu Ini",
+      value: loading ? "..." : formatNumber(totalWeeklyAttendance),
+      desc: "Akumulasi mahasiswa hadir",
+      accent: "text-forestgreen",
+    },
+    {
+      label: "Total Mahasiswa",
+      value: loading ? "..." : formatNumber(stats.mahasiswa),
+      desc: "Mahasiswa terdaftar",
+      accent: "text-mediumslateblue",
+    },
+  ];
+
+  return (
+    <div className="space-y-10 font-arimo text-slate-900">
+      <section className="rounded-3xl bg-white/90 p-6 shadow-card ring-1 ring-slate-100">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.4em] text-slate-400">
+              Ringkasan data absensi hari ini
+            </p>
+            <h2 className="text-3xl font-bold text-steelblue-200">Dashboard</h2>
+          </div>
+          <div className="flex items-center gap-3 text-slate-500">
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-steelblue-100 to-steelblue-200 text-2xl text-white shadow-lg">
+              📈
+            </span>
+            <div className="text-sm">
+              <p className="font-semibold text-slate-600">Live update</p>
+              <p className="text-slate-400">Data terintegrasi dengan sistem QR-Lab</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+          {statCards.map((card) => (
+            <div
+              key={card.label}
+              className="rounded-num-14 border border-slate-200/80 bg-white/70 p-5 shadow-sm shadow-slate-200/50 transition hover:-translate-y-1 hover:shadow-lg"
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-500">{card.label}</p>
+                <span className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl text-lg ${card.badge}`}>
+                  {card.icon}
+                </span>
+              </div>
+              <div className={`mt-4 text-4xl font-bold ${card.accent}`}>
+                {loading ? "..." : formatNumber(card.value)}
+              </div>
+              <p className="mt-1 text-xs text-slate-400">{card.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-3xl bg-white p-6 shadow-card ring-1 ring-slate-100">
+        <div className="mb-6 flex flex-col gap-1">
+          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Menu Cepat</p>
+          <h3 className="text-2xl font-semibold text-slate-800">Akses kilat aktivitas utama</h3>
+        </div>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          {quickMenus.map((menu) => (
+            <button
+              key={menu.label}
+              type="button"
+              onClick={menu.onClick}
+              className="group flex h-full flex-col items-center rounded-2xl border-2 border-slate-100 bg-gradient-to-br from-white to-slate-50/60 p-6 text-center shadow-sm transition hover:-translate-y-1 hover:border-steelblue-100/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-steelblue-100/70"
+            >
+              <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-steelblue-100/10 text-3xl text-steelblue-100">
+                {menu.icon}
+              </span>
+              <p className="text-lg font-semibold text-slate-800">{menu.label}</p>
+              <p className="mt-2 text-sm text-slate-500">{menu.desc}</p>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-3xl bg-white p-6 shadow-card ring-1 ring-slate-100">
+        <div className="flex flex-col gap-1">
+          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Grafik Kehadiran Minggu Ini</p>
+          <h3 className="text-2xl font-semibold text-slate-800">
+            Perbandingan jumlah mahasiswa hadir dengan total mahasiswa per hari
+          </h3>
+        </div>
+
+        {loading ? (
+          <div className="flex h-56 flex-col items-center justify-center gap-3 text-slate-400">
+            <span className="h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-steelblue-100" />
+            Memuat data…
+          </div>
+        ) : chartData.length ? (
+          <>
+            <div className="mt-8 grid min-h-[14rem] grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-5">
+              {chartData.map((item) => {
+                const percent = item.total ? Math.round((item.hadir / item.total) * 100) : 0;
+                const totalHeight = Math.max((item.total / safeMaxChartValue) * 100, 10);
+                const hadirHeight = Math.max((item.hadir / safeMaxChartValue) * 100, 6);
+
+                return (
+                  <div key={item.label} className="flex flex-col items-center gap-2 text-center">
+                    <div className="relative flex h-48 w-14 items-end justify-center">
+                      <div
+                        className="w-[2.25rem] rounded-full bg-gainsboro"
+                        style={{ height: `${Math.min(totalHeight, 100)}%` }}
+                      />
+                      <div
+                        className="absolute bottom-0 w-[2.25rem] rounded-full bg-steelblue-100"
+                        style={{ height: `${Math.min(hadirHeight, 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-sm font-semibold text-slate-800">{item.label}</p>
+                    <p className="text-xs text-slate-500">{percent}% hadir</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center gap-5 text-xs text-slate-500">
+              <span className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-sm bg-steelblue-100" /> Mahasiswa Hadir
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-sm bg-gainsboro" /> Total Mahasiswa
+              </span>
+            </div>
+          </>
+        ) : (
+          <div className="flex h-56 flex-col items-center justify-center text-slate-400">
+            Belum ada data minggu ini
+          </div>
+        )}
+
+        <div className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {summaryCards.map((card) => (
+            <div key={card.label} className="rounded-2xl border border-slate-100 bg-slate-50/80 p-5">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{card.label}</p>
+              <p className={`mt-2 text-3xl font-bold ${card.accent}`}>{card.value}</p>
+              <p className="mt-1 text-sm text-slate-500">{card.desc}</p>
+            </div>
+          ))}
+          <div className="rounded-2xl border border-slate-100 bg-white/80 p-5">
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Hari dengan kehadiran tertinggi</p>
+            <p className="mt-2 text-3xl font-bold text-steelblue-200">{highestAttendanceDay}</p>
+            <p className="mt-1 text-sm text-slate-500">Pantau puncak aktivitas lab</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}

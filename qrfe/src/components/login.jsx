@@ -27,20 +27,20 @@ function Login({ onLogin }) {
     setLoading(true); 
     setMsg('');
     try {
-      // Mengirim {username, password} ke API
-      // Pastikan backend Anda (qrbe) menerima 'username'. 
-      // Jika backend *harus* menerima 'email', ganti state di atas
+      // Langsung kirim request login (tanpa CSRF cookie untuk API token)
       const { data } = await api.post('/login', { 
-        email: username, // Mengirim state username sebagai 'email'
+        email: username,
         password: password 
       });
       
       const token = data.token;
       const user  = data.user ?? data;
       localStorage.setItem('authToken', token);
-      onLogin?.(user, token); // Memanggil prop onLogin dari App.jsx
+      onLogin?.(user, token);
     } catch (err) {
-      setMsg(err.response?.data?.message || 'Gagal login. Cek username/password.');
+      console.error('Login error:', err);
+      const errorMsg = err.response?.data?.message || err.message || 'Gagal login. Cek username/password.';
+      setMsg(errorMsg);
     } finally {
       setLoading(false);
     }

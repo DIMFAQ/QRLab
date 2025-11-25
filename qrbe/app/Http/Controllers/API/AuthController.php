@@ -63,6 +63,13 @@ class AuthController extends Controller
             return response()->json(['message' => 'Kredensial salah.'], 422);
         }
 
+        // Cek apakah ada password reset pending
+        if ($user->password_reset_pending) {
+            return response()->json([
+                'message' => 'Password reset sedang menunggu persetujuan admin. Silakan hubungi admin untuk mengaktifkan akun Anda.'
+            ], 403);
+        }
+
         // --- INI PERBAIKANNYA ---
         // Wajib verified (disetujui admin) untuk login, TAPI HANYA UNTUK PRAKTIKAN
         if ($user->role === 'praktikan' && ! $user->hasVerifiedEmail()) {
@@ -111,46 +118,61 @@ class AuthController extends Controller
     public function forgotPassword(Request $request)
     {
         $request->validate([
-            'email' => 'required|email|exists:users,email',
+            'email' => 'required|email',
         ]);
 
-        // Bikin token reset manual
-        $status = Password::sendResetLink(
-            $request->only('email')
-        );
+        $user = User::where('email', $request->email)->first();
 
-        if ($status === Password::RESET_LINK_SENT) {
-            return response()->json(['message' => 'Tautan reset password telah dikirim ke email kamu.']);
+        // Cek apakah email terdaftar
+        if (!$user) {
+            return response()->json([
+                'message' => 'Email tidak terdaftar dalam sistem.'
+            ], 404);
         }
 
-        return response()->json(['message' => __($status)], 400);
+        // Cek apakah user adalah admin (admin tidak bisa reset password sendiri)
+        if ($user->role === 'admin') {
+            return response()->json([
+                'message' => 'Admin tidak dapat mereset password melalui fitur ini. Hubungi super admin.'
+            ], 403);
+        }
+
+        return response()->json([
+            'message' => 'Email ditemukan. Silakan buat password baru.',
+            'email' => $request->email
+        ]);
     }
 
-    // POST /api/reset-password  body: { email, token, password, password_confirmation }
+    // POST /api/reset-password  body: { email, password, password_confirmation }
     public function resetPassword(Request $request)
     {
         $request->validate([
-            'token'                 => 'required',
-            'email'                 => 'required|email',
+            'email'                 => 'required|email|exists:users,email',
             'password'              => ['required', 'confirmed', PasswordRule::min(8)],
         ]);
 
-        $status = Password::reset(
-            $request->only('email', 'password', 'password_confirmation', 'token'),
-            function ($user, $password) {
-                $user->forceFill([
-                    'password' => Hash::make($password),
-                    'remember_token' => Str::random(60),
-                ])->save();
+        $user = User::where('email', $request->email)->first();
 
-                event(new PasswordReset($user));
-            }
-        );
-
-        if ($status === Password::PASSWORD_RESET) {
-            return response()->json(['message' => __($status)]);
+        if (!$user) {
+            return response()->json(['message' => 'User tidak ditemukan.'], 404);
         }
-        return response()->json(['message' => __($status)], 422);
+
+        // Cek apakah user adalah admin
+        if ($user->role === 'admin') {
+            return response()->json([
+                'message' => 'Admin tidak dapat mereset password melalui fitur ini.'
+            ], 403);
+        }
+
+        // Simpan password baru ke temp_password dan set flag pending
+        $user->temp_password = Hash::make($request->password);
+        $user->password_reset_pending = true;
+        $user->email_verified_at = null; // Set ke null untuk menandakan pending approval
+        $user->save();
+
+        return response()->json([
+            'message' => 'Password baru berhasil dibuat. Menunggu persetujuan admin untuk mengaktifkan akun Anda.'
+        ]);
     }
 
     // === Verifikasi Email (Tidak terpakai di alur ini, tapi biarkan saja) ===
@@ -176,5 +198,83 @@ class AuthController extends Controller
 
         $request->user()->sendEmailVerificationNotification();
         return response()->json(['message' => 'Link verifikasi dikirim.']);
+    }
+
+
+    // === Admin Password Reset Approval ===
+
+    // GET /api/admin/pending-password-resets - Ambil semua user dengan password_reset_pending
+    public function getPendingPasswordResets(Request $request)
+    {
+        // Pastikan yang akses adalah admin
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Admin only.'], 403);
+        }
+
+        $pendingUsers = User::where('password_reset_pending', true)
+            ->select('id', 'name', 'email', 'role', 'updated_at')
+            ->get();
+
+        return response()->json([
+            'pending_resets' => $pendingUsers
+        ]);
+    }
+
+    // POST /api/admin/approve-password-reset/{userId} - Approve password reset
+    public function approvePasswordReset(Request $request, $userId)
+    {
+        // Pastikan yang akses adalah admin
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Admin only.'], 403);
+        }
+
+        $user = User::find($userId);
+
+        if (!$user) {
+            return response()->json(['message' => 'User tidak ditemukan.'], 404);
+        }
+
+        if (!$user->password_reset_pending) {
+            return response()->json(['message' => 'User tidak memiliki password reset pending.'], 400);
+        }
+
+        // Pindahkan temp_password ke password dan reset flag
+        $user->password = $user->temp_password;
+        $user->temp_password = null;
+        $user->password_reset_pending = false;
+        $user->email_verified_at = now(); // Verifikasi email juga sekaligus
+        $user->save();
+
+        return response()->json([
+            'message' => 'Password reset berhasil disetujui. User dapat login sekarang.'
+        ]);
+    }
+
+    // POST /api/admin/reject-password-reset/{userId} - Reject password reset
+    public function rejectPasswordReset(Request $request, $userId)
+    {
+        // Pastikan yang akses adalah admin
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Admin only.'], 403);
+        }
+
+        $user = User::find($userId);
+
+        if (!$user) {
+            return response()->json(['message' => 'User tidak ditemukan.'], 404);
+        }
+
+        if (!$user->password_reset_pending) {
+            return response()->json(['message' => 'User tidak memiliki password reset pending.'], 400);
+        }
+
+        // Hapus temp_password dan reset flag
+        $user->temp_password = null;
+        $user->password_reset_pending = false;
+        $user->save();
+
+        return response()->json([
+            'message' => 'Password reset ditolak. User tetap menggunakan password lama.'
+        ]);
     }
 }

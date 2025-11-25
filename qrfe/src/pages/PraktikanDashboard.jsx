@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import QrScannerComponent from '../components/QrScanner';
 
@@ -24,6 +25,14 @@ const IconHistory = () => (
   </svg>
 );
 
+const IconCalendar = () => (
+  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+    <path fillRule="evenodd"
+      d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
+      clipRule="evenodd"></path>
+  </svg>
+);
+
 const IconLogout = () => (
   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
     <path fillRule="evenodd"
@@ -32,67 +41,8 @@ const IconLogout = () => (
   </svg>
 );
 
-
 // ----------------------------
-// PAGE SCANNER (SCAN QR)
-// ----------------------------
-const PageScanner = () => {
-  const [scanResult, setScanResult] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  const handleScan = async (qrValue) => {
-    if (!qrValue || qrValue === scanResult) return;
-
-    setScanResult(qrValue);
-    setError('');
-    setSuccess('');
-
-    try {
-      const response = await api.post('/praktikan/check-in', {
-        qr_token: qrValue,
-      });
-      setSuccess(response.data.message || 'Presensi berhasil!');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Gagal melakukan presensi.');
-    }
-  };
-
-  return (
-    <div className="flex flex-col items-center pt-10">
-      <h2 className="text-2xl text-center font-['Arimo'] font-bold text-gray-800 mb-6">
-        Scan Untuk Presensi
-      </h2>
-
-      <div className="w-64 h-64 bg-black relative overflow-hidden rounded-lg border-2 border-black">
-        <QrScannerComponent onDetected={handleScan} />
-
-        {/* Border Sudut Mockup */}
-        <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-black"></div>
-        <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-black"></div>
-        <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-black"></div>
-        <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-black"></div>
-      </div>
-
-
-      {error && (
-        <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-lg w-full max-w-xs text-center">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="mt-4 p-3 bg-green-100 text-green-700 rounded-lg w-full max-w-xs text-center">
-          {success}
-        </div>
-      )}
-    </div>
-  );
-};
-
-
-// ----------------------------
-// PAGE RIWAYAT
+// STATUS PILL COMPONENT
 // ----------------------------
 const StatusPill = ({ status }) => {
   switch (status) {
@@ -123,6 +73,70 @@ const StatusPill = ({ status }) => {
   }
 };
 
+// ----------------------------
+// PAGE SCANNER (SCAN QR)
+// ----------------------------
+const PageScanner = () => {
+  const [scanResult, setScanResult] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const handleScan = async (qrValue) => {
+    if (!qrValue || qrValue === scanResult) return;
+
+    setScanResult(qrValue);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await api.post('/praktikan/check-in', {
+        qr_token: qrValue,
+      });
+      setSuccess(response.data.message || 'Presensi berhasil!');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal melakukan presensi.');
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center pt-6 px-4">
+      <h2 className="text-2xl text-center font-['Arimo'] font-bold text-gray-800 mb-6">
+        Scan Untuk Presensi
+      </h2>
+
+      <div className="w-full max-w-sm aspect-square bg-black relative overflow-hidden rounded-lg border-4 border-[#076BB2] shadow-lg">
+        <QrScannerComponent onDetected={handleScan} />
+
+        {/* Border Sudut Mockup */}
+        <div className="absolute top-2 left-2 w-8 h-8 border-l-4 border-t-4 border-white"></div>
+        <div className="absolute top-2 right-2 w-8 h-8 border-r-4 border-t-4 border-white"></div>
+        <div className="absolute bottom-2 left-2 w-8 h-8 border-l-4 border-b-4 border-white"></div>
+        <div className="absolute bottom-2 right-2 w-8 h-8 border-r-4 border-b-4 border-white"></div>
+      </div>
+
+      {/* Message Display */}
+      {success && (
+        <div className="mt-4 w-full max-w-sm p-3 bg-green-100 border border-green-300 rounded-lg text-green-800 text-sm">
+          ✅ {success}
+        </div>
+      )}
+
+      {error && (
+        <div className="mt-4 w-full max-w-sm p-3 bg-red-100 border border-red-300 rounded-lg text-red-800 text-sm">
+          ❌ {error}
+        </div>
+      )}
+
+      <p className="mt-4 text-xs text-gray-500 text-center px-4">
+        Arahkan kamera ke QR Code yang ditampilkan admin
+      </p>
+    </div>
+  );
+};
+
+// ----------------------------
+// PAGE HISTORY (RIWAYAT)
+// ----------------------------
 const PageHistory = () => {
   const [data, setData] = useState({ summary: {}, history: [] });
   const [loading, setLoading] = useState(true);
@@ -176,12 +190,19 @@ const PageHistory = () => {
           {history.map((item) => (
             <div key={item.id} className="py-3">
               <div className="flex justify-between items-center">
-                <span className="font-bold text-sm">
-                  Judul {item.meeting_number} - {item.meeting_name}
-                </span>
+                <div className="flex-1">
+                  <div className="font-bold text-sm">
+                    {item.course_code} - Pertemuan {item.meeting_number}
+                  </div>
+                  <div className="text-xs text-gray-600">
+                    {item.course_name} - {item.class_name}
+                  </div>
+                </div>
                 <StatusPill status={item.status} />
               </div>
-              <div className="text-xs text-gray-500 mt-1">{item.scanned_at}</div>
+              <div className="text-xs text-gray-500 mt-1">
+                {item.scanned_at ? item.scanned_at : 'Tidak hadir'}
+              </div>
             </div>
           ))}
         </div>
@@ -190,13 +211,184 @@ const PageHistory = () => {
   );
 };
 
+// ----------------------------
+// PAGE SCHEDULE (JADWAL)
+// ----------------------------
+const PageSchedule = () => {
+  const [schedules, setSchedules] = useState([]);
+  const [enrollments, setEnrollments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadSchedule = async () => {
+      try {
+        const res = await api.get('/praktikan/jadwal');
+        console.log('Jadwal response:', res.data);
+        
+        setEnrollments(res.data.enrollments || []);
+        
+        // Filter: hanya tampilkan jadwal yang belum selesai
+        const now = new Date();
+        const allSchedules = res.data.schedules || [];
+        
+        console.log('Total schedules:', allSchedules.length);
+        console.log('Current time:', now);
+        
+        const upcomingSchedules = allSchedules.filter(item => {
+          const endTime = new Date(item.end_time);
+          console.log(`Meeting ${item.id}: end_time=${endTime}, is_open=${item.is_open}, is future?`, endTime > now);
+          // Tampilkan jika: end_time masih di masa depan ATAU meeting sedang buka (is_open)
+          return endTime > now || item.is_open;
+        });
+        
+        console.log('Upcoming schedules:', upcomingSchedules.length);
+        setSchedules(upcomingSchedules);
+      } catch (e) {
+        console.error('Gagal memuat jadwal', e);
+      }
+      setLoading(false);
+    };
+
+    loadSchedule();
+  }, []);
+
+  const formatDateTime = (datetime) => {
+    if (!datetime) return '-';
+    const date = new Date(datetime);
+    return date.toLocaleString('id-ID', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const formatTime = (datetime) => {
+    if (!datetime) return '-';
+    const date = new Date(datetime);
+    return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  return (
+    <div className="p-4">
+      {/* Enrollment Info */}
+      {enrollments.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <h3 className="text-sm font-bold text-blue-800 mb-2">Praktikum yang Diikuti:</h3>
+          <div className="space-y-1">
+            {enrollments.map((e, idx) => (
+              <div key={idx} className="text-xs text-blue-700">
+                📚 {e.course} - {e.class}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white shadow-md rounded-lg p-4">
+        <h3 className="text-lg font-bold mb-4">Jadwal Pertemuan Mendatang</h3>
+
+        {loading && <div className="text-center p-4">Memuat...</div>}
+
+        {!loading && schedules.length === 0 && (
+          <div className="text-center p-4 text-gray-500">
+            Tidak ada jadwal mendatang. Semua pertemuan sudah selesai atau belum dijadwalkan.
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {schedules.map((item) => {
+            const isUpcoming = new Date(item.start_time) > new Date();
+            const isPast = new Date(item.end_time) < new Date();
+            
+            return (
+              <div
+                key={item.id}
+                className={`border rounded-lg p-3 ${
+                  item.has_attended
+                    ? 'bg-green-50 border-green-200'
+                    : item.is_open
+                    ? 'bg-yellow-50 border-yellow-300'
+                    : isUpcoming
+                    ? 'bg-blue-50 border-blue-200'
+                    : 'bg-gray-50 border-gray-200'
+                }`}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex-1">
+                    <div className="font-bold text-sm text-gray-800">
+                      {item.course_code} - Pertemuan {item.meeting_number}
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      {item.course_name} - {item.class_name}
+                    </div>
+                  </div>
+                  {item.has_attended && (
+                    <span className="text-xs font-bold px-2 py-1 rounded-full bg-green-200 text-green-800">
+                      ✓ {item.attendance_status}
+                    </span>
+                  )}
+                  {!item.has_attended && item.is_open && (
+                    <span className="text-xs font-bold px-2 py-1 rounded-full bg-yellow-200 text-yellow-800">
+                      🔴 BUKA
+                    </span>
+                  )}
+                </div>
+
+                <div className="text-xs text-gray-600 space-y-1">
+                  <div>📅 {formatDateTime(item.start_time)}</div>
+                  <div>⏱️ {formatTime(item.start_time)} - {formatTime(item.end_time)}</div>
+                  {item.has_attended && item.attendance_time && (
+                    <div className="text-green-600 font-semibold">
+                      ✓ Absen: {formatDateTime(item.attendance_time)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ----------------------------
 // MAIN DASHBOARD
 // ----------------------------
 export default function PraktikanDashboard({ user }) {
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activePage, setActivePage] = useState('dashboard');
+  const [profilePhoto, setProfilePhoto] = useState(null);
+
+  useEffect(() => {
+    loadProfilePhoto();
+    
+    // Listen untuk update dari ProfileSettings
+    const handleProfileUpdate = () => {
+      loadProfilePhoto();
+    };
+    
+    window.addEventListener('profilePhotoUpdated', handleProfileUpdate);
+    
+    return () => {
+      window.removeEventListener('profilePhotoUpdated', handleProfileUpdate);
+    };
+  }, []);
+
+  const loadProfilePhoto = async () => {
+    try {
+      const res = await api.get('/profile');
+      if (res.data.profile_photo) {
+        setProfilePhoto(res.data.profile_photo);
+      }
+    } catch (error) {
+      console.error('Failed to load profile photo:', error);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -208,6 +400,7 @@ export default function PraktikanDashboard({ user }) {
 
   const renderPage = () => {
     if (activePage === 'dashboard') return <PageScanner />;
+    if (activePage === 'jadwal') return <PageSchedule />;
     if (activePage === 'history') return <PageHistory />;
     return <PageScanner />;
   };
@@ -218,8 +411,8 @@ export default function PraktikanDashboard({ user }) {
         setActivePage(page);
         setSidebarOpen(false);
       }}
-      className={`flex items-center w-full px-4 py-3 rounded-lg ${
-        activePage === page ? 'bg-[#076BB2] text-white' : 'text-gray-700'
+      className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors ${
+        activePage === page ? 'bg-[#076BB2] text-white' : 'text-gray-700 hover:bg-gray-100'
       }`}
     >
       {icon}
@@ -230,29 +423,52 @@ export default function PraktikanDashboard({ user }) {
   return (
     <div className="min-h-screen bg-[#E9E9E9] w-full mx-auto relative overflow-hidden">
       {/* Header */}
-      <header className="h-16 bg-[#076BB2] flex items-center justify-between px-4 sticky top-0 z-20">
-        <button onClick={() => setSidebarOpen(true)}>
+      <header className="h-16 bg-[#076BB2] flex items-center justify-between px-4 sticky top-0 z-20 shadow-md">
+        <button onClick={() => setSidebarOpen(true)} className="p-1 hover:bg-white/10 rounded-lg transition">
           <IconMenu />
         </button>
         <span className="text-white text-lg font-bold">QR-Lab</span>
-        <img src="https://placehold.co/30x30" className="w-8 h-8 rounded-full" />
+        {profilePhoto ? (
+          <img
+            src={profilePhoto}
+            alt="Profile"
+            className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-md cursor-pointer"
+            onClick={() => navigate('/profile')}
+          />
+        ) : (
+          <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer"
+            onClick={() => navigate('/profile')}>
+            {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+          </div>
+        )}
       </header>
 
-      {/* Sidebar */}
+      {/* Sidebar Overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/50 z-30" onClick={() => setSidebarOpen(false)}></div>
       )}
 
+      {/* Sidebar */}
       <div
-        className={`fixed top-0 left-0 h-full bg-[#E9E9E9] w-64 z-40 shadow-lg p-4 transform transition-transform duration-300 
+        className={`fixed top-0 left-0 h-full bg-white w-64 z-40 shadow-xl p-4 transform transition-transform duration-300 
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        <div className="flex items-center mb-4 p-2">
-          <img src="https://placehold.co/40x40" className="w-10 h-10 rounded-full border border-blue-500" />
-          <div className="ml-3 overflow-hidden">
-            <div className="text-xs font-bold truncate">{user.name}</div>
-            <div className="text-xs bg-gray-800 text-white px-2 py-0.5 rounded-full mt-1 truncate">
-              {user.member?.npm || user.email}
+        <div className="flex items-center mb-6 p-2">
+          {profilePhoto ? (
+            <img
+              src={profilePhoto}
+              alt="Profile"
+              className="w-10 h-10 rounded-full object-cover border-2 border-blue-300 shadow-md"
+            />
+          ) : (
+            <div className="w-10 h-10 bg-[#076BB2] rounded-full flex items-center justify-center text-white font-bold border-2 border-blue-300">
+              {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+            </div>
+          )}
+          <div className="ml-3 overflow-hidden flex-1">
+            <div className="text-sm font-bold truncate">{user?.name || 'User'}</div>
+            <div className="text-xs bg-gray-800 text-white px-2 py-0.5 rounded-full mt-1 truncate inline-block">
+              {user?.member?.npm || user?.email || 'Praktikan'}
             </div>
           </div>
         </div>
@@ -261,16 +477,31 @@ export default function PraktikanDashboard({ user }) {
 
         <nav className="space-y-2">
           <NavButton icon={<IconDashboard />} label="Dashboard" page="dashboard" />
+          <NavButton icon={<IconCalendar />} label="Jadwal Pertemuan" page="jadwal" />
           <NavButton icon={<IconHistory />} label="Riwayat Presensi" page="history" />
-          <button onClick={handleLogout} className="flex items-center w-full px-4 py-3 text-gray-700">
+          <button 
+            onClick={() => navigate('/profile')} 
+            className="flex items-center w-full px-4 py-3 text-gray-700 hover:bg-blue-50 rounded-lg transition-colors"
+          >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+            </svg>
+            <span className="ml-3 font-medium text-sm">Profil Saya</span>
+          </button>
+          <button 
+            onClick={handleLogout} 
+            className="flex items-center w-full px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          >
             <IconLogout />
             <span className="ml-3 font-medium text-sm">Logout</span>
           </button>
         </nav>
       </div>
 
-      <main className="p-4">{renderPage()}</main>
+      {/* Main Content */}
+      <main className="pb-4">{renderPage()}</main>
 
+      {/* Footer */}
       <footer className="text-center text-xs text-gray-500 p-4 mt-10">
         © 2025 QR-Lab Unila | Fakultas Teknik
       </footer>

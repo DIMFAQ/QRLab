@@ -13,13 +13,17 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminKelolaSesi from "./pages/AdminKelolaSesi";
 import AdminKelolaMahasiswa from "./pages/AdminKelolaMahasiswa";
 import AdminRekapAbsensi from "./pages/AdminRekapAbsensi";
+import AdminPasswordResets from "./pages/AdminPasswordResets";
+import AdminKelolaEnrollment from "./pages/AdminKelolaEnrollment";
 
 import Login from "./components/login";
 import Register from "./components/Register";
-import ForgotPassword from "./components/ForgotPassword";
-import ResetPassword from "./components/ResetPassword";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import ResetSuccess from "./pages/ResetSuccess";
 
 import PraktikanDashboard from "./pages/PraktikanDashboard";
+import ProfileSettings from "./pages/ProfileSettings";
 
 function AppContent() {
   const [user, setUser] = useState(null);
@@ -114,6 +118,7 @@ function AppContent() {
 
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/reset-success" element={<ResetSuccess />} />
 
         {/* ADMIN */}
         <Route
@@ -130,7 +135,9 @@ function AppContent() {
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="sesi" element={<AdminKelolaSesi />} />
           <Route path="mahasiswa" element={<AdminKelolaMahasiswa />} />
+          <Route path="enrollment" element={<AdminKelolaEnrollment />} />
           <Route path="rekap" element={<AdminRekapAbsensi />} />
+          <Route path="password-resets" element={<AdminPasswordResets />} />
         </Route>
 
         {/* PRAKTIKAN */}
@@ -139,6 +146,18 @@ function AppContent() {
           element={
             isPraktikan ? (
               <PraktikanDashboard user={user} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        {/* PROFILE SETTINGS (Admin & Praktikan) */}
+        <Route
+          path="/profile"
+          element={
+            user ? (
+              <ProfileSettings />
             ) : (
               <Navigate to="/login" replace />
             )
