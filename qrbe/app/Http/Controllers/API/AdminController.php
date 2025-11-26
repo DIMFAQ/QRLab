@@ -95,24 +95,11 @@ class AdminController extends Controller
     public function getMahasiswa(Request $request)
     {
         $searchTerm = $request->query('search');
-        $status = $request->query('status'); 
 
         $query = Member::with('user')
             ->whereHas('user', function ($q) {
                 $q->where('role', 'praktikan');
             });
-
-        if ($status && $status !== 'all') {
-            if ($status === 'pending') {
-                $query->whereHas('user', function ($q) {
-                    $q->whereNull('email_verified_at');
-                });
-            } elseif ($status === 'active') {
-                $query->whereHas('user', function ($q) {
-                    $q->whereNotNull('email_verified_at');
-                });
-            }
-        }
 
         if ($searchTerm) {
             $query->where(function ($q) use ($searchTerm) {
@@ -131,8 +118,7 @@ class AdminController extends Controller
                 'id' => $member->id,
                 'student_id' => $member->student_id, 
                 'name' => $member->user->name, 
-                'email' => $member->user->email,
-                'status' => $member->user->email_verified_at ? 'active' : 'pending'
+                'email' => $member->user->email
             ];
         });
 
@@ -148,8 +134,7 @@ class AdminController extends Controller
             'student_id' => 'required|string|unique:members,student_id', 
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email',
-            'password' => 'nullable|string|min:6', 
-            'status' => 'required|string|in:pending,active',
+            'password' => 'nullable|string|min:6'
         ]);
 
         if ($validator->fails()) {
@@ -167,14 +152,14 @@ class AdminController extends Controller
                 'name' => $data['name']
             ]);
 
-            // Baru buat user dengan member_id
+            // Baru buat user dengan member_id, langsung aktif
             User::create([
                 'name' => $data['name'],
                 'email' => $data['email'],
                 'password' => $data['password'] ? Hash::make($data['password']) : Hash::make(Str::random(10)),
                 'role' => 'praktikan',
                 'member_id' => $member->id,
-                'email_verified_at' => $data['status'] === 'active' ? now() : null,
+                'email_verified_at' => now()
             ]);
 
             DB::commit(); 
@@ -214,8 +199,7 @@ class AdminController extends Controller
                 'max:255',
                 Rule::unique('users')->ignore($user->id),
             ],
-            'password' => 'nullable|string|min:6', 
-            'status' => 'required|string|in:pending,active',
+            'password' => 'nullable|string|min:6'
         ]);
 
         if ($validator->fails()) {
@@ -229,7 +213,7 @@ class AdminController extends Controller
 
             $user->name = $data['name'];
             $user->email = $data['email'];
-            $user->email_verified_at = $data['status'] === 'active' ? now() : null;
+            $user->email_verified_at = now(); // Selalu aktif
 
             if (!empty($data['password'])) {
                 $user->password = Hash::make($data['password']);

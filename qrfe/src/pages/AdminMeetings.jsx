@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import MeetingForm from '../components/MeetingForm';
-import AdminUserVerification from '../components/AdminUserVerification';
 import { QRCodeCanvas as QRCode } from 'qrcode.react';
 
 // Impor ikon placeholder (gantilah dengan ikon React jika ada)
@@ -180,11 +179,6 @@ export default function AdminMeetingsPage({ user, onLogout }) {
   // Konten Asli (Kelola Sesi)
   const OriginalContent = () => (
     <>
-      {/* Verifikasi Pengguna (dari file asli Anda) */}
-      <div className="container mx-auto p-4 bg-blue-50 rounded-lg shadow mb-6">
-        <AdminUserVerification />
-      </div>
-
       {/* Konten Utama (Form, QR, Riwayat) */}
       <main className="max-w-3xl mx-auto p-4 bg-white rounded-lg shadow">
         <section className="rounded-2xl p-5 mb-6">

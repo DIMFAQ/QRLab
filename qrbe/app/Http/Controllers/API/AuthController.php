@@ -39,12 +39,11 @@ class AuthController extends Controller
             'password'   => Hash::make($data['password']),
             'role'       => 'praktikan',
             'member_id'  => $member->id,
-            // email_verified_at sengaja dibiarkan NULL
+            'email_verified_at' => now(), // Auto-approve
         ]);
 
-        // Pesan diubah untuk memberitahu user agar menunggu persetujuan
         return response()->json([
-            'message' => 'Registrasi berhasil. Akun Anda sedang menunggu persetujuan Admin.',
+            'message' => 'Registrasi berhasil. Silakan login.',
         ], 201);
     }
 
@@ -63,35 +62,11 @@ class AuthController extends Controller
             return response()->json(['message' => 'Kredensial salah.'], 422);
         }
 
-        // Cek apakah ada password reset pending
-        if ($user->password_reset_pending) {
-            // Jika ada temp_password, cek juga dengan password baru
-            $passwordMatch = Hash::check($credentials['password'], $user->password);
-            if ($user->temp_password) {
-                $passwordMatch = $passwordMatch || Hash::check($credentials['password'], $user->temp_password);
-            }
-
-            if (!$passwordMatch) {
-                return response()->json(['message' => 'Kredensial salah.'], 422);
-            }
-
-            return response()->json([
-                'message' => 'Password reset sedang menunggu persetujuan admin. Silakan hubungi admin untuk mengaktifkan akun Anda.'
-            ], 403);
-        }
-
-        // Cek password untuk user yang tidak pending
+        // Cek password
         if (! Hash::check($credentials['password'], $user->password)) {
             return response()->json(['message' => 'Kredensial salah.'], 422);
         }
 
-        // --- INI PERBAIKANNYA ---
-        // Wajib verified (disetujui admin) untuk login, TAPI HANYA UNTUK PRAKTIKAN
-        if ($user->role === 'praktikan' && ! $user->hasVerifiedEmail()) {
-            return response()->json(['message' => 'Akun Anda belum disetujui oleh Admin.'], 403);
-        }
-        
-        // Baris `$token = ...` yang hilang sudah dikembalikan
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
@@ -114,8 +89,11 @@ class AuthController extends Controller
             'id'    => $u->id,
             'email' => $u->email,
             'role'  => $u->role,
-            'name'  => optional($u->member)->name,
-            'npm'   => optional($u->member)->student_id,
+            'name'  => $u->name, // Ambil dari tabel users langsung
+            'member' => $u->member ? [
+                'student_id' => $u->member->student_id,
+                'name' => $u->member->name
+            ] : null,
             'email_verified' => $u->hasVerifiedEmail(),
         ]);
     }
@@ -179,14 +157,15 @@ class AuthController extends Controller
             ], 403);
         }
 
-        // Simpan password baru ke temp_password dan set flag pending
-        $user->temp_password = Hash::make($request->password);
-        $user->password_reset_pending = true;
-        $user->email_verified_at = null; // Set ke null untuk menandakan pending approval
+        // Langsung update password tanpa approval
+        $user->password = Hash::make($request->password);
+        $user->temp_password = null;
+        $user->password_reset_pending = false;
+        $user->email_verified_at = now(); // Auto-approve
         $user->save();
 
         return response()->json([
-            'message' => 'Password baru berhasil dibuat. Menunggu persetujuan admin untuk mengaktifkan akun Anda.'
+            'message' => 'Password berhasil diubah. Silakan login dengan password baru Anda.'
         ]);
     }
 

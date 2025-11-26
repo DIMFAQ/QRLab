@@ -52,6 +52,8 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'is_admin'])->group(function
     // === Rute Manajemen Meeting (TETAP ADA) ===
     Route::post('/meetings', [MeetingController::class, 'store']);
     Route::get('/meetings', [MeetingController::class, 'index']);
+    Route::post('/meetings/auto-start', [MeetingController::class, 'autoStart']);
+    Route::post('/meetings/auto-close', [MeetingController::class, 'autoClose']);
     Route::post('/meetings/{meeting}/close', [MeetingController::class, 'close']);
     Route::get('/meetings/{meeting}/active-qr', [MeetingController::class, 'getActiveQr']);
     Route::get('/meetings/{meeting}/rekap', [MeetingController::class, 'rekap']);

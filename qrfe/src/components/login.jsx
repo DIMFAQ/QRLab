@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
 import api from '../api'; // Import api yang sudah ada
 
 // Komponen Ikon QR (dibuat ulang dengan Tailwind agar skalabel)
@@ -70,21 +69,17 @@ function Login({ onLogin }) {
           className="bg-white rounded-2xl p-7" 
           style={{ boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.30)' }}
         >
-          <h2 className="text-base font-bold text-gray-900 mb-5">
-            Masuk
-          </h2>
-          
           {/* Form sekarang memiliki handler onSubmit */}
           <form onSubmit={submit}>
             {/* --- Input Username --- */}
             <div className="mb-4">
               <label className="block text-sm text-gray-900 mb-1" htmlFor="username">
-                Username
+                Email
               </label>
               <input
-                type="text" // Di file asli Anda 'email', tapi UI-nya 'username'
+                type="email"
                 id="username"
-                placeholder="Masukkan username"
+                placeholder="Masukkan email"
                 className="w-full px-4 py-2.5 bg-[#E9E9E9] rounded-lg text-sm text-gray-900 placeholder:text-[#717171] focus:outline-none focus:ring-2 focus:ring-[#076BB2]"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -117,16 +112,6 @@ function Login({ onLogin }) {
               </div>
             </div>
 
-            {/* --- Link Lupa Password --- */}
-            <div className="text-right mb-5">
-              <Link 
-                to="/forgot-password" // Link dari file asli
-                className="text-sm text-[#076BB2] hover:underline"
-              >
-                Lupa Password?
-              </Link>
-            </div>
-
             {/* --- Pesan Error (dari file asli) --- */}
             {msg && <p className="text-sm text-center text-red-600 mb-3">{msg}</p>}
 
@@ -140,17 +125,6 @@ function Login({ onLogin }) {
               {loading ? 'Memproses...' : 'Masuk'}
             </button>
           </form>
-
-          {/* --- Link Daftar --- */}
-          <p className="text-center text-sm text-gray-900 mt-8">
-            Belum punya akun?{' '}
-            <Link 
-              to="/register" // Link dari file asli
-              className="text-[#076BB2] hover:underline"
-            >
-              Daftar Sekarang
-            </Link>
-          </p>
         </div>
 
         {/* --- Footer --- */}

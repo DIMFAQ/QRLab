@@ -51,7 +51,7 @@ class MasterDataController extends Controller
             'capacity' => 'nullable|integer|min:1',
         ]);
 
-        $class = ClassModel::create($validated);
+        $class = PraktikumClass::create($validated);
 
         return response()->json([
             'message' => 'Kelas berhasil ditambahkan',

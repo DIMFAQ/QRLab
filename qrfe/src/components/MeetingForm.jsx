@@ -22,7 +22,6 @@ export default function MeetingForm({ onMeetingCreated, activeQr }) {
     meeting_number: 1,
     qr_duration_minutes: 5,
     start_time: getJakartaTime(0),
-    end_time: getJakartaTime(1),
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -61,11 +60,28 @@ export default function MeetingForm({ onMeetingCreated, activeQr }) {
   const onChange = (e) =>
     setFormData((s) => ({ ...s, [e.target.name]: e.target.value }));
 
+  // Hitung waktu selesai otomatis dari waktu mulai + durasi
+  const calculateEndTime = () => {
+    if (!formData.start_time || !formData.qr_duration_minutes) return '';
+    
+    const startDate = new Date(formData.start_time);
+    const endDate = new Date(startDate.getTime() + (Number(formData.qr_duration_minutes) * 60 * 1000));
+    
+    const year = endDate.getFullYear();
+    const month = String(endDate.getMonth() + 1).padStart(2, '0');
+    const day = String(endDate.getDate()).padStart(2, '0');
+    const hours = String(endDate.getHours()).padStart(2, '0');
+    const minutes = String(endDate.getMinutes()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (activeQr) return alert('Tutup dulu sesi yang sedang aktif.');
     setLoading(true);
     setError('');
+
+    const endTime = calculateEndTime();
 
     const payload = {
       course_id: Number(formData.course_id),
@@ -73,7 +89,7 @@ export default function MeetingForm({ onMeetingCreated, activeQr }) {
       meeting_number: Number(formData.meeting_number), 
       qr_duration_minutes: Number(formData.qr_duration_minutes),
       start_time: formData.start_time,
-      end_time: formData.end_time,
+      end_time: endTime,
     };
 
     try {
@@ -172,13 +188,18 @@ export default function MeetingForm({ onMeetingCreated, activeQr }) {
       <div>
         <label className="text-sm font-medium text-slate-700">Waktu Selesai</label>
         <input
-          type="datetime-local"
-          name="end_time"
-          value={formData.end_time}
-          onChange={onChange}
-          required
-          className={inputClass}
+          type="text"
+          value={calculateEndTime() ? new Date(calculateEndTime()).toLocaleString('id-ID', { 
+            dateStyle: 'short', 
+            timeStyle: 'short' 
+          }) : '-'}
+          disabled
+          className={`${inputClass} bg-slate-100 text-slate-600 cursor-not-allowed`}
+          placeholder="Otomatis dihitung"
         />
+        <p className="text-xs text-slate-500 mt-1">
+          Dihitung dari waktu mulai + durasi QR
+        </p>
       </div>
 
       {error && (
@@ -190,10 +211,10 @@ export default function MeetingForm({ onMeetingCreated, activeQr }) {
       <div className="sm:col-span-2">
         <button
           type="submit"
-          disabled={loading || !!activeQr}
+          disabled={loading}
           className="w-full rounded-xl bg-blue-600 py-2.5 text-white font-semibold shadow hover:bg-blue-700 active:scale-[.98] disabled:bg-slate-400 transition"
         >
-          {loading ? 'Membuat Sesi…' : activeQr ? 'Sesi Aktif' : 'Buat & Generate QR'}
+          {loading ? 'Membuat Sesi…' : 'Buat & Jadwalkan Sesi'}
         </button>
       </div>
     </form>

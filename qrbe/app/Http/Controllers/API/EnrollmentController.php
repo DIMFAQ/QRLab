@@ -126,8 +126,14 @@ class EnrollmentController extends Controller
 
         // Triple nested loop: students × courses × classes
         foreach ($request->member_ids as $memberId) {
+            $member = Member::find($memberId);
+            
             foreach ($request->course_ids as $courseId) {
+                $course = \App\Models\Course::find($courseId);
+                
                 foreach ($request->class_ids as $classId) {
+                    $class = \App\Models\PraktikumClass::find($classId);
+                    
                     // Cek duplikat
                     $exists = Enrollment::where('member_id', $memberId)
                         ->where('course_id', $courseId)
@@ -136,6 +142,13 @@ class EnrollmentController extends Controller
 
                     if ($exists) {
                         $skipped++;
+                        $errors[] = sprintf(
+                            "%s (%s) sudah terdaftar di %s - %s",
+                            $member->name,
+                            $member->student_id,
+                            $course->code,
+                            $class->name
+                        );
                         continue;
                     }
 

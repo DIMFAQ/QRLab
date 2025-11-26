@@ -57,12 +57,12 @@ export default function ResetSuccess() {
 
           {/* Title */}
           <h2 className="text-base font-bold text-center text-gray-900 mb-2">
-            Menunggu Verifikasi Admin
+            Password Berhasil Direset
           </h2>
           
           {/* Description */}
           <p className="text-sm text-center text-gray-600 mb-5">
-            Silakan hubungi admin untuk menyetujui perubahan password Anda agar dapat login kembali.
+            Password Anda telah berhasil diubah. Silakan login menggunakan password baru Anda.
           </p>
 
           {/* Button */}

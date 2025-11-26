@@ -49,15 +49,6 @@ const NAV_ITEMS = [
       </svg>
     )
   },
-  { 
-    to: '/admin/password-resets', 
-    label: 'Reset Password', 
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
-      </svg>
-    )
-  },
 ];
 
 const AdminLayout = ({ user, onLogout }) => {
@@ -100,8 +91,8 @@ const AdminLayout = ({ user, onLogout }) => {
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      {/* Sidebar */}
-      <aside className="w-80 flex flex-col" style={{ backgroundColor: '#0B456E' }}>
+      {/* Sidebar - Fixed */}
+      <aside className="w-80 flex flex-col fixed left-0 top-0 h-screen" style={{ backgroundColor: '#0B456E' }}>
         <div className="p-6 flex items-center gap-3">
           <div className="w-16 h-16 rounded-xl bg-white/95 flex items-center justify-center shadow-lg">
             <svg className="w-10 h-10" style={{ color: '#0B456E' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -148,16 +139,18 @@ const AdminLayout = ({ user, onLogout }) => {
         </div>
       </aside>
 
-      {/* Main area */}
-      <div className="flex-1 flex flex-col bg-white">
-        <header className="bg-white border-b border-slate-200 px-8 py-6 flex items-center justify-between">
+      {/* Main area - dengan margin kiri untuk sidebar */}
+      <div className="flex-1 flex flex-col bg-white ml-80">
+        {/* Header - Fixed */}
+        <header className="bg-white border-b border-slate-200 px-8 py-6 flex items-center justify-between fixed top-0 right-0 z-10" style={{ left: '20rem', width: 'calc(100% - 20rem)' }}>
           <div>
             <h2 className="text-2xl font-bold text-slate-800">{getActiveTitle()}</h2>
           </div>
           <div className="flex items-center gap-4">
             <div 
-              className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-slate-50 cursor-pointer transition" 
+              className="cursor-pointer transition hover:opacity-80" 
               onClick={() => navigate('/profile')}
+              title="Edit Profil"
             >
               {profilePhoto ? (
                 <img
@@ -170,15 +163,12 @@ const AdminLayout = ({ user, onLogout }) => {
                   {user?.name?.charAt(0)?.toUpperCase() || 'A'}
                 </div>
               )}
-              <div className="text-sm">
-                <div className="font-semibold text-slate-800">{user?.name || 'Admin'}</div>
-                <div className="text-xs text-slate-500">{user?.role || 'Administrator'}</div>
-              </div>
             </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-[#F5F6FA] p-8">
+        {/* Main content - dengan padding top untuk header */}
+        <main className="flex-1 overflow-y-auto bg-[#F5F6FA] p-8 mt-[88px]">
           <Outlet />
         </main>
       </div>

@@ -76,7 +76,7 @@ const StatusPill = ({ status }) => {
 // ----------------------------
 // PAGE SCANNER (SCAN QR)
 // ----------------------------
-const PageScanner = () => {
+const PageScanner = ({ onScanSuccess }) => {
   const [scanResult, setScanResult] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -93,6 +93,11 @@ const PageScanner = () => {
         qr_token: qrValue,
       });
       setSuccess(response.data.message || 'Presensi berhasil!');
+      
+      // Trigger refresh jadwal dan riwayat setelah 1 detik
+      setTimeout(() => {
+        if (onScanSuccess) onScanSuccess();
+      }, 1000);
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal melakukan presensi.');
     }
@@ -137,23 +142,28 @@ const PageScanner = () => {
 // ----------------------------
 // PAGE HISTORY (RIWAYAT)
 // ----------------------------
-const PageHistory = () => {
+const PageHistory = ({ refreshKey }) => {
   const [data, setData] = useState({ summary: {}, history: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadHistory = async () => {
+      setLoading(true);
       try {
         const res = await api.get('/praktikan/history');
-        setData(res.data);
+        setData({
+          summary: res.data.summary || { hadir: 0, terlambat: 0, alpa: 0 },
+          history: Array.isArray(res.data.history) ? res.data.history : []
+        });
       } catch (e) {
         console.error("Gagal memuat riwayat", e);
+        setData({ summary: { hadir: 0, terlambat: 0, alpa: 0 }, history: [] });
       }
       setLoading(false);
     };
 
     loadHistory();
-  }, []);
+  }, [refreshKey]); // Re-load when refreshKey changes
 
   const { summary, history } = data;
 
@@ -182,12 +192,12 @@ const PageHistory = () => {
 
         {loading && <div className="text-center p-4">Memuat...</div>}
 
-        {!loading && history.length === 0 && (
+        {!loading && (!history || history.length === 0) && (
           <div className="text-center p-4 text-gray-500">Belum ada riwayat.</div>
         )}
 
         <div className="divide-y divide-gray-200">
-          {history.map((item) => (
+          {!loading && history && history.map((item) => (
             <div key={item.id} className="py-3">
               <div className="flex justify-between items-center">
                 <div className="flex-1">
@@ -214,7 +224,7 @@ const PageHistory = () => {
 // ----------------------------
 // PAGE SCHEDULE (JADWAL)
 // ----------------------------
-const PageSchedule = () => {
+const PageSchedule = ({ refreshKey }) => {
   const [schedules, setSchedules] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -227,22 +237,13 @@ const PageSchedule = () => {
         
         setEnrollments(res.data.enrollments || []);
         
-        // Filter: hanya tampilkan jadwal yang belum selesai
-        const now = new Date();
+        // Backend sudah filter: hanya kirim meeting yang belum terlaksana (belum presensi)
+        // Tidak perlu filter lagi di frontend
         const allSchedules = res.data.schedules || [];
         
         console.log('Total schedules:', allSchedules.length);
-        console.log('Current time:', now);
         
-        const upcomingSchedules = allSchedules.filter(item => {
-          const endTime = new Date(item.end_time);
-          console.log(`Meeting ${item.id}: end_time=${endTime}, is_open=${item.is_open}, is future?`, endTime > now);
-          // Tampilkan jika: end_time masih di masa depan ATAU meeting sedang buka (is_open)
-          return endTime > now || item.is_open;
-        });
-        
-        console.log('Upcoming schedules:', upcomingSchedules.length);
-        setSchedules(upcomingSchedules);
+        setSchedules(allSchedules);
       } catch (e) {
         console.error('Gagal memuat jadwal', e);
       }
@@ -250,12 +251,22 @@ const PageSchedule = () => {
     };
 
     loadSchedule();
-  }, []);
+  }, [refreshKey]); // Re-load when refreshKey changes
+
+  // Helper: Convert UTC to Jakarta timezone (UTC+7)
+  const toJakartaTime = (utcDateString) => {
+    if (!utcDateString) return null;
+    const date = new Date(utcDateString);
+    if (Number.isNaN(date.getTime())) return null;
+    // Add timezone offset untuk Jakarta (UTC+7 = 420 minutes)
+    return new Date(date.getTime() + (7 * 60 * 60 * 1000));
+  };
 
   const formatDateTime = (datetime) => {
     if (!datetime) return '-';
-    const date = new Date(datetime);
-    return date.toLocaleString('id-ID', {
+    const jakartaDate = toJakartaTime(datetime);
+    if (!jakartaDate) return '-';
+    return jakartaDate.toLocaleString('id-ID', {
       weekday: 'short',
       year: 'numeric',
       month: 'short',
@@ -267,8 +278,12 @@ const PageSchedule = () => {
 
   const formatTime = (datetime) => {
     if (!datetime) return '-';
-    const date = new Date(datetime);
-    return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    const jakartaDate = toJakartaTime(datetime);
+    if (!jakartaDate) return '-';
+    return jakartaDate.toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   return (
@@ -301,15 +316,12 @@ const PageSchedule = () => {
         <div className="space-y-3">
           {schedules.map((item) => {
             const isUpcoming = new Date(item.start_time) > new Date();
-            const isPast = new Date(item.end_time) < new Date();
             
             return (
               <div
                 key={item.id}
                 className={`border rounded-lg p-3 ${
-                  item.has_attended
-                    ? 'bg-green-50 border-green-200'
-                    : item.is_open
+                  item.is_open
                     ? 'bg-yellow-50 border-yellow-300'
                     : isUpcoming
                     ? 'bg-blue-50 border-blue-200'
@@ -325,14 +337,19 @@ const PageSchedule = () => {
                       {item.course_name} - {item.class_name}
                     </div>
                   </div>
-                  {item.has_attended && (
-                    <span className="text-xs font-bold px-2 py-1 rounded-full bg-green-200 text-green-800">
-                      ✓ {item.attendance_status}
+                  {item.is_open && (
+                    <span className="text-xs font-bold px-2 py-1 rounded-full bg-yellow-200 text-yellow-800">
+                      🔴 BUKA - SEGERA PRESENSI
                     </span>
                   )}
-                  {!item.has_attended && item.is_open && (
-                    <span className="text-xs font-bold px-2 py-1 rounded-full bg-yellow-200 text-yellow-800">
-                      🔴 BUKA
+                  {!item.is_open && isUpcoming && (
+                    <span className="text-xs font-bold px-2 py-1 rounded-full bg-blue-200 text-blue-800">
+                      📅 AKAN DATANG
+                    </span>
+                  )}
+                  {!item.is_open && !isUpcoming && (
+                    <span className="text-xs font-bold px-2 py-1 rounded-full bg-gray-200 text-gray-700">
+                      ⏳ BELUM PRESENSI
                     </span>
                   )}
                 </div>
@@ -340,11 +357,6 @@ const PageSchedule = () => {
                 <div className="text-xs text-gray-600 space-y-1">
                   <div>📅 {formatDateTime(item.start_time)}</div>
                   <div>⏱️ {formatTime(item.start_time)} - {formatTime(item.end_time)}</div>
-                  {item.has_attended && item.attendance_time && (
-                    <div className="text-green-600 font-semibold">
-                      ✓ Absen: {formatDateTime(item.attendance_time)}
-                    </div>
-                  )}
                 </div>
               </div>
             );
@@ -363,6 +375,12 @@ export default function PraktikanDashboard({ user }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activePage, setActivePage] = useState('dashboard');
   const [profilePhoto, setProfilePhoto] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleScanSuccess = () => {
+    // Increment refreshKey to trigger reload of PageHistory and PageSchedule
+    setRefreshKey(prev => prev + 1);
+  };
 
   useEffect(() => {
     loadProfilePhoto();
@@ -399,10 +417,10 @@ export default function PraktikanDashboard({ user }) {
   };
 
   const renderPage = () => {
-    if (activePage === 'dashboard') return <PageScanner />;
-    if (activePage === 'jadwal') return <PageSchedule />;
-    if (activePage === 'history') return <PageHistory />;
-    return <PageScanner />;
+    if (activePage === 'dashboard') return <PageScanner onScanSuccess={handleScanSuccess} />;
+    if (activePage === 'jadwal') return <PageSchedule refreshKey={refreshKey} />;
+    if (activePage === 'history') return <PageHistory refreshKey={refreshKey} />;
+    return <PageScanner onScanSuccess={handleScanSuccess} />;
   };
 
   const NavButton = ({ icon, label, page }) => (

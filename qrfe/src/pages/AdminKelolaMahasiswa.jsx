@@ -6,15 +6,13 @@ export default function AdminKelolaMahasiswa() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [status, setStatus] = useState("all"); // all | active | pending
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     student_id: "",
     name: "",
     email: "",
-    password: "",
-    status: "pending"
+    password: ""
   });
   const [errorMsg, setErrorMsg] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -23,7 +21,7 @@ export default function AdminKelolaMahasiswa() {
     setLoading(true);
     try {
       const timestamp = `&_t=${new Date().getTime()}`;
-      const q = `?search=${encodeURIComponent(searchTerm || "")}&status=${encodeURIComponent(status || "all")}${timestamp}`;
+      const q = `?search=${encodeURIComponent(searchTerm || "")}${timestamp}`;
       const res = await api.get(`/admin/users${q}`);
       setStudents(res.data || []);
     } catch (e) {
@@ -38,7 +36,7 @@ export default function AdminKelolaMahasiswa() {
       load();
     }, 300);
     return () => clearTimeout(delay);
-  }, [searchTerm, status]);
+  }, [searchTerm]);
 
   const remove = async (id) => {
     if (!window.confirm("Anda yakin ingin menghapus mahasiswa ini?")) return;
@@ -63,8 +61,7 @@ export default function AdminKelolaMahasiswa() {
       student_id: "",
       name: "",
       email: "",
-      password: "",
-      status: "pending"
+      password: ""
     });
     setShowModal(true);
   };
@@ -76,8 +73,7 @@ export default function AdminKelolaMahasiswa() {
       student_id: item.student_id || "",
       name: item.name || "",
       email: item.email || "",
-      password: "",
-      status: item.status === "active" ? "active" : "pending",
+      password: ""
     });
     setShowModal(true);
   };
@@ -102,8 +98,7 @@ export default function AdminKelolaMahasiswa() {
         student_id: form.student_id,
         name: form.name,
         email: form.email,
-        password: form.password || undefined,
-        status: form.status
+        password: form.password || undefined
       };
 
       if (editingId) {
@@ -133,42 +128,10 @@ export default function AdminKelolaMahasiswa() {
     <div className="space-y-8 px-4 py-6 max-w-6xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-3 flex-1">
-          <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-50">
-            <button
-              onClick={() => setStatus("all")}
-              className={`px-5 py-2 font-semibold transition ${
-                status === "all"
-                  ? "bg-blue-100 text-blue-800"
-                  : "bg-transparent text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              Semua
-            </button>
-            <button
-              onClick={() => setStatus("active")}
-              className={`px-5 py-2 font-semibold transition ${
-                status === "active"
-                  ? "bg-green-100 text-green-700"
-                  : "bg-transparent text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              Aktif
-            </button>
-            <button
-              onClick={() => setStatus("pending")}
-              className={`px-5 py-2 font-semibold transition ${
-                status === "pending"
-                  ? "bg-yellow-100 text-yellow-700"
-                  : "bg-transparent text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              Menunggu Verif
-            </button>
-          </div>
           <input
             type="text"
             placeholder="Cari mahasiswa (ID/Nama/Email)..."
-            className="ml-3 border border-gray-300 bg-white placeholder-gray-400 px-4 py-2.5 rounded-lg shadow-sm text-base w-full max-w-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 transition"
+            className="border border-gray-300 bg-white placeholder-gray-400 px-4 py-2.5 rounded-lg shadow-sm text-base w-full max-w-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-200 transition"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             spellCheck={false}
@@ -194,7 +157,6 @@ export default function AdminKelolaMahasiswa() {
                 <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Student ID</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Nama</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Aksi</th>
               </tr>
             </thead>
@@ -204,17 +166,6 @@ export default function AdminKelolaMahasiswa() {
                   <td className="px-6 py-4 align-top font-mono whitespace-nowrap">{s.student_id}</td>
                   <td className="px-6 py-4 align-top font-semibold text-slate-800 max-w-xs break-words">{s.name}</td>
                   <td className="px-6 py-4 align-top text-slate-700 max-w-xs break-all">{s.email}</td>
-                  <td className="px-6 py-4 align-top">
-                    <span className={`px-3 py-1 inline-block text-xs font-semibold rounded-xl shadow-sm ${
-                      s.status === "active" 
-                        ? "bg-green-100 text-green-800" 
-                        : s.status === "pending" 
-                        ? "bg-yellow-100 text-yellow-800"
-                        : "bg-slate-100 text-slate-800"
-                    }`}>
-                      {s.status === "active" ? "Aktif" : s.status === "pending" ? "Menunggu" : s.status}
-                    </span>
-                  </td>
                   <td className="px-6 py-4 align-top">
                     <div className="flex gap-2">
                       <button
@@ -278,7 +229,7 @@ export default function AdminKelolaMahasiswa() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Password (opsional)</label>
+                <label className="block text-sm font-medium mb-1">Password</label>
                 <input
                   type="password"
                   value={form.password}
@@ -286,17 +237,6 @@ export default function AdminKelolaMahasiswa() {
                   className="w-full border border-gray-300 px-3 py-2 rounded-lg"
                   placeholder={editingId ? "Isi untuk ganti password" : ""}
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Status</label>
-                <select
-                  value={form.status}
-                  onChange={(e) => handleChange("status", e.target.value)}
-                  className="w-full border border-gray-300 px-3 py-2 rounded-lg"
-                >
-                  <option value="pending">Menunggu Verifikasi</option>
-                  <option value="active">Aktif</option>
-                </select>
               </div>
               <div className="flex justify-end space-x-3 pt-2">
                 <button

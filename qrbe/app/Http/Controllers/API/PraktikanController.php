@@ -136,18 +136,26 @@ class PraktikanController extends Controller
             ]);
         }
 
-        // Ambil semua meeting yang sudah lewat (end_time < sekarang) dari enrollment
-        $pastMeetings = Meeting::whereIn('id', $validMeetingIds)
-            ->where('end_time', '<', now())
-            ->with(['course:id,code,name', 'praktikumClass:id,code,name'])
-            ->orderBy('start_time', 'desc')
-            ->get();
-
-        // Ambil attendance mahasiswa
+        // Ambil attendance mahasiswa dulu
         $attendances = Attendance::where('member_id', $member->id)
             ->whereIn('meeting_id', $validMeetingIds)
             ->get()
             ->keyBy('meeting_id');
+
+        // Ambil semua meeting yang sudah lewat ATAU sudah di-presensi
+        $allMeetings = Meeting::whereIn('id', $validMeetingIds)
+            ->with(['course:id,code,name', 'praktikumClass:id,code,name'])
+            ->orderBy('start_time', 'desc')
+            ->get();
+
+        // Filter: tampilkan jika end_time sudah lewat ATAU sudah ada attendance
+        $pastMeetings = $allMeetings->filter(function($meeting) use ($attendances) {
+            $hasAttendance = $attendances->has($meeting->id);
+            $isPast = $meeting->end_time < now();
+            
+            // Tampilkan di riwayat jika: sudah presensi ATAU meeting sudah selesai
+            return $hasAttendance || $isPast;
+        });
 
         $summary = [
             'hadir' => 0,
@@ -196,7 +204,7 @@ class PraktikanController extends Controller
 
         return response()->json([
             'summary' => $summary,
-            'history' => $history
+            'history' => $history->values()->toArray() // Convert to array with sequential keys
         ]);
     }
 
@@ -284,6 +292,16 @@ class PraktikanController extends Controller
                     ->where('meeting_id', $meeting->id)
                     ->first();
 
+                // FILTER: Hanya tampilkan di jadwal jika belum presensi
+                // Jika sudah presensi, akan masuk ke riwayat otomatis
+                if ($attendance) {
+                    \Log::info('Skipping meeting - already attended', [
+                        'meeting_id' => $meeting->id,
+                        'attendance_id' => $attendance->id
+                    ]);
+                    continue;
+                }
+
                 // Hitung status attendance
                 $attendanceStatus = null;
                 if ($attendance) {
@@ -319,9 +337,9 @@ class PraktikanController extends Controller
                     'start_time' => $meeting->start_time,
                     'end_time' => $meeting->end_time,
                     'is_open' => $meeting->is_open,
-                    'has_attended' => $attendance ? true : false,
-                    'attendance_status' => $attendanceStatus,
-                    'attendance_time' => $attendance ? $attendance->created_at : null,
+                    'has_attended' => false, // Di jadwal berarti belum presensi
+                    'attendance_status' => null,
+                    'attendance_time' => null,
                 ];
             }
         }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
 use App\Models\MeetingToken;
+use App\Models\QrSession;
 use App\Models\User; // <-- Pastikan ini ada
 use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
@@ -109,14 +110,14 @@ class MeetingController extends Controller
 
         // Ambil data course dan class untuk generate nama meeting
         $course = \App\Models\Course::findOrFail($validated['course_id']);
-        $class = \App\Models\ClassModel::findOrFail($validated['class_id']);
+        $class = \App\Models\PraktikumClass::findOrFail($validated['class_id']);
         
         // Generate nama meeting otomatis: "Jaringan Komputer - Kelas A - Pertemuan 1"
         $meetingName = "{$course->name} - {$class->name} - Pertemuan {$validated['meeting_number']}";
 
-        // Parse waktu dengan timezone Jakarta (GMT+7)
-        $startTime = Carbon::parse($validated['start_time'], 'Asia/Jakarta');
-        $endTime = Carbon::parse($validated['end_time'], 'Asia/Jakarta');
+        // Parse waktu dari frontend (Jakarta time) dan konversi ke UTC untuk disimpan
+        $startTime = Carbon::parse($validated['start_time'], 'Asia/Jakarta')->setTimezone('UTC');
+        $endTime = Carbon::parse($validated['end_time'], 'Asia/Jakarta')->setTimezone('UTC');
 
         $meeting = Meeting::create([
             'name' => $meetingName,
@@ -126,17 +127,15 @@ class MeetingController extends Controller
             'start_time' => $startTime,
             'end_time' => $endTime,
             'qr_duration_minutes' => $validated['qr_duration_minutes'],
-            'is_open' => false, // Meeting dibuat tapi belum dibuka (admin manual start nanti)
+            'is_open' => false, // Meeting dibuat tapi belum dibuka (akan auto-start sesuai waktu)
             'user_id' => auth()->id(), // Simpan siapa admin yg buat
         ]);
-
-        // TIDAK auto-generate QR token, admin harus manual start sesuai jadwal
 
         // Kembalikan data meeting yang baru dibuat
         return response()->json([
             'meeting_id' => $meeting->id,
             'meeting_name' => $meetingName,
-            'message' => 'Meeting berhasil dijadwalkan. Klik "Mulai" untuk membuka QR Code saat waktunya tiba.',
+            'message' => 'Meeting berhasil dijadwalkan. Sesi akan otomatis dimulai pada waktu yang ditentukan.',
         ], 201);
     }
 
@@ -242,21 +241,60 @@ class MeetingController extends Controller
      */
     public function rekap(Meeting $meeting)
     {
-        // Ambil data absensi dengan relasi member
-        $attendances = $meeting->attendances()
-                              ->with(['member']) // Eager load member
-                              ->get();
+        // 1. Ambil semua member yang terdaftar di course + class meeting ini
+        $enrolledMembers = \App\Models\Enrollment::where('course_id', $meeting->course_id)
+                                                  ->where('class_id', $meeting->class_id)
+                                                  ->where('is_active', true)
+                                                  ->with('member')
+                                                  ->get();
 
-        $rekap = $attendances->map(function ($att) {
-            return [
-                'member' => [
-                    'student_id' => $att->member->student_id ?? 'N/A',
-                    'name' => $att->member->name ?? 'N/A',
-                ],
-                'checked_in_at' => $att->checked_in_at,
-                'status' => 'Hadir', // Default status
-            ];
-        });
+        // 2. Ambil data absensi untuk meeting ini
+        $attendances = $meeting->attendances()
+                              ->get()
+                              ->keyBy('member_id'); // Jadikan member_id sebagai key
+
+        $rekap = [];
+
+        // 3. Looping semua member yang enrolled
+        foreach ($enrolledMembers as $enrollment) {
+            $member = $enrollment->member;
+            
+            if (!$member) continue; // Skip jika member tidak ada
+
+            // Cek apakah member ini sudah absen
+            if ($attendances->has($member->id)) {
+                $att = $attendances->get($member->id);
+                
+                // Hitung status berdasarkan waktu scan
+                $startTime = \Carbon\Carbon::parse($meeting->start_time);
+                $scanTime = \Carbon\Carbon::parse($att->checked_in_at);
+                $minutesLate = $startTime->diffInMinutes($scanTime, false);
+                
+                $status = $minutesLate <= 15 ? 'Hadir' : 'Terlambat';
+                
+                $rekap[] = [
+                    'member' => [
+                        'student_id' => $member->student_id,
+                        'name' => $member->name,
+                    ],
+                    'checked_in_at' => $scanTime->timezone('Asia/Jakarta')->format('H.i.s') . ' WIB',
+                    'status' => $status,
+                ];
+            } else {
+                // Jika tidak ada di daftar hadir = ALPA
+                $rekap[] = [
+                    'member' => [
+                        'student_id' => $member->student_id,
+                        'name' => $member->name,
+                    ],
+                    'checked_in_at' => '-',
+                    'status' => 'Alpa',
+                ];
+            }
+        }
+
+        // Urutkan berdasarkan NPM
+        $rekap = collect($rekap)->sortBy('member.student_id')->values();
 
         return response()->json($rekap);
     }
@@ -312,41 +350,53 @@ class MeetingController extends Controller
             return response()->json(['message' => 'Meeting tidak ditemukan'], 404);
         }
 
-        // 2. Ambil semua praktikan yang terdaftar
-        // Asumsi: semua user dengan role 'praktikan' adalah peserta
-        $allPraktikan = User::where('role', 'praktikan')
-                            ->with('member') // Ambil data NPM & Nama
-                            ->get();
+        // 2. Ambil semua member yang terdaftar di course + class meeting ini
+        $enrolledMembers = \App\Models\Enrollment::where('course_id', $meeting->course_id)
+                                                  ->where('class_id', $meeting->class_id)
+                                                  ->where('is_active', true)
+                                                  ->with('member')
+                                                  ->get();
 
         // 3. Ambil data absensi untuk meeting ini
         $attendances = $meeting->attendances()
-                              ->with('user')
                               ->get()
-                              ->keyBy('user_id'); // Jadikan user_id sebagai key
+                              ->keyBy('member_id'); // Jadikan member_id sebagai key
 
         $rekap = [];
 
-        // 4. Looping semua praktikan, cek satu per satu
-        foreach ($allPraktikan as $praktikan) {
-            $npm = $praktikan->member->npm ?? $praktikan->email; //
-            $name = $praktikan->member->name ?? $praktikan->name; //
+        // 4. Looping semua member yang enrolled, cek satu per satu
+        foreach ($enrolledMembers as $enrollment) {
+            $member = $enrollment->member;
+            
+            if (!$member) continue; // Skip jika member tidak ada
 
-            // Cek apakah praktikan ini ada di daftar hadir
-            if ($attendances->has($praktikan->id)) {
-                $att = $attendances->get($praktikan->id);
+            $npm = $member->student_id;
+            $name = $member->name;
+
+            // Cek apakah member ini sudah absen
+            if ($attendances->has($member->id)) {
+                $att = $attendances->get($member->id);
+                
+                // Hitung status berdasarkan waktu scan
+                $startTime = \Carbon\Carbon::parse($meeting->start_time);
+                $scanTime = \Carbon\Carbon::parse($att->checked_in_at);
+                $minutesLate = $startTime->diffInMinutes($scanTime, false);
+                
+                $status = $minutesLate <= 15 ? 'Hadir' : 'Terlambat';
+                
                 $rekap[] = [
                     'npm' => $npm,
                     'name' => $name,
-                    'status' => $att->status, // 'Hadir' atau 'Terlambat'
-                    'scan_time' => $att->created_at->format('H:i:s \W\I\B'),
+                    'status' => $status,
+                    'scan_time' => $scanTime->timezone('Asia/Jakarta')->format('H.i.s') . ' WIB',
                 ];
             } else {
-                // Jika tidak ada di daftar hadir
+                // Jika tidak ada di daftar hadir = ALPA
                 $rekap[] = [
                     'npm' => $npm,
                     'name' => $name,
-                    'status' => 'Alpa', // Sesuai desain
-                    'scan_time' => null,
+                    'status' => 'Alpa',
+                    'scan_time' => '-',
                 ];
             }
         }
@@ -355,5 +405,115 @@ class MeetingController extends Controller
         $rekap = collect($rekap)->sortBy('npm')->values();
 
         return response()->json($rekap);
+    }
+
+    /**
+     * Auto-start meetings based on scheduled time
+     */
+    public function autoStart(Request $request)
+    {
+        $now = Carbon::now('Asia/Jakarta');
+        
+        \Log::info('Auto-start check at Jakarta time: ' . $now->toDateTimeString());
+        \Log::info('Auto-start check at UTC time: ' . $now->copy()->setTimezone('UTC')->toDateTimeString());
+        
+        // Find meetings that should be started
+        // Konversi waktu ke UTC untuk perbandingan dengan database
+        $nowUtc = $now->copy()->setTimezone('UTC');
+        
+        $meetingsToStart = Meeting::where('is_open', false)
+            ->where('start_time', '<=', $nowUtc)
+            ->where('end_time', '>', $nowUtc)
+            ->get();
+
+        \Log::info('Found ' . $meetingsToStart->count() . ' meetings to start');
+        
+        foreach ($meetingsToStart as $m) {
+            \Log::info("Meeting #{$m->id}: start={$m->start_time}, end={$m->end_time}, is_open={$m->is_open}");
+        }
+
+        $started = [];
+
+        foreach ($meetingsToStart as $meeting) {
+            try {
+                \Log::info("Starting meeting {$meeting->id}: {$meeting->name}");
+                
+                // Set meeting to open (sama seperti manual start)
+                $meeting->is_open = true;
+                $meeting->save();
+
+                // Generate QR token (sama seperti manual start dengan MeetingToken)
+                $duration = $meeting->qr_duration_minutes ?? 5;
+                $expiresAt = Carbon::now('Asia/Jakarta')->addMinutes($duration);
+                
+                $token = $meeting->tokens()->create([
+                    'token' => Str::random(40),
+                    'expires_at' => $expiresAt,
+                ]);
+
+                $started[] = [
+                    'meeting_id' => $meeting->id,
+                    'name' => $meeting->name,
+                    'qr_token' => $token->token,
+                    'expires_at' => $token->expires_at->toDateTimeString(),
+                ];
+                
+                \Log::info("Successfully started meeting {$meeting->id}");
+            } catch (\Exception $e) {
+                \Log::error("Failed to auto-start meeting {$meeting->id}: " . $e->getMessage());
+            }
+        }
+
+        return response()->json([
+            'started_count' => count($started),
+            'started_meetings' => $started,
+            'current_time_jakarta' => $now->toDateTimeString(),
+            'current_time_utc' => $nowUtc->toDateTimeString(),
+        ]);
+    }
+
+    /**
+     * Auto-close meetings when QR token expires (5 minutes after opened)
+     */
+    public function autoClose(Request $request)
+    {
+        $now = Carbon::now('Asia/Jakarta');
+        
+        // Find meetings with expired QR tokens
+        $meetingsToClose = Meeting::where('is_open', true)
+            ->whereHas('tokens', function($query) use ($now) {
+                $query->where('expires_at', '<=', $now);
+            })
+            ->get();
+
+        $closed = [];
+
+        foreach ($meetingsToClose as $meeting) {
+            try {
+                // Check if ALL tokens are expired
+                $hasActiveToken = $meeting->tokens()
+                    ->where('expires_at', '>', $now)
+                    ->exists();
+                
+                // Only close if no active tokens
+                if (!$hasActiveToken) {
+                    // Update meeting to closed
+                    $meeting->update(['is_open' => false]);
+
+                    $closed[] = [
+                        'meeting_id' => $meeting->id,
+                        'name' => $meeting->name,
+                        'closed_at' => $now->toDateTimeString(),
+                    ];
+                }
+            } catch (\Exception $e) {
+                \Log::error("Failed to auto-close meeting {$meeting->id}: " . $e->getMessage());
+            }
+        }
+
+        return response()->json([
+            'closed_count' => count($closed),
+            'closed_meetings' => $closed,
+        ]);
     }
 }

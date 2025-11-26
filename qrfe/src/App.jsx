@@ -13,14 +13,9 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminKelolaSesi from "./pages/AdminKelolaSesi";
 import AdminKelolaMahasiswa from "./pages/AdminKelolaMahasiswa";
 import AdminRekapAbsensi from "./pages/AdminRekapAbsensi";
-import AdminPasswordResets from "./pages/AdminPasswordResets";
 import AdminKelolaEnrollment from "./pages/AdminKelolaEnrollment";
 
 import Login from "./components/login";
-import Register from "./components/Register";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import ResetSuccess from "./pages/ResetSuccess";
 
 import PraktikanDashboard from "./pages/PraktikanDashboard";
 import ProfileSettings from "./pages/ProfileSettings";
@@ -31,10 +26,7 @@ function AppContent() {
   const location = useLocation();
 
   const isAuthRoute =
-    location.pathname.startsWith("/login") ||
-    location.pathname.startsWith("/register") ||
-    location.pathname.startsWith("/forgot-password") ||
-    location.pathname.startsWith("/reset-password");
+    location.pathname.startsWith("/login");
 
   const isAdminRoute = location.pathname.startsWith("/admin");
   const isPraktikanRoute = location.pathname.startsWith("/praktikan");
@@ -105,21 +97,6 @@ function AppContent() {
           }
         />
 
-        <Route
-          path="/register"
-          element={
-            user ? (
-              <Navigate to={isAdmin ? "/admin" : "/praktikan"} replace />
-            ) : (
-              <Register />
-            )
-          }
-        />
-
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/reset-success" element={<ResetSuccess />} />
-
         {/* ADMIN */}
         <Route
           path="/admin"
@@ -137,7 +114,6 @@ function AppContent() {
           <Route path="mahasiswa" element={<AdminKelolaMahasiswa />} />
           <Route path="enrollment" element={<AdminKelolaEnrollment />} />
           <Route path="rekap" element={<AdminRekapAbsensi />} />
-          <Route path="password-resets" element={<AdminPasswordResets />} />
         </Route>
 
         {/* PRAKTIKAN */}

@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../api";
 
 export default function AdminRekapAbsensi() {
+  const [searchParams] = useSearchParams();
   const [courses, setCourses] = useState([]);
   const [classes, setClasses] = useState([]);
   const [meetings, setMeetings] = useState([]);
@@ -13,6 +15,21 @@ export default function AdminRekapAbsensi() {
   const [attendances, setAttendances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingRekap, setLoadingRekap] = useState(false);
+
+  // Load rekap attendance saat meeting dipilih
+  const loadRekap = async (meetingId) => {
+    if (!meetingId) return;
+    
+    setLoadingRekap(true);
+    try {
+      const res = await api.get(`/admin/meetings/${meetingId}/rekap`);
+      setAttendances(res.data || []);
+    } catch (e) {
+      console.error(e);
+      setAttendances([]);
+    }
+    setLoadingRekap(false);
+  };
 
   // Load courses and classes on mount
   useEffect(() => {
@@ -36,6 +53,27 @@ export default function AdminRekapAbsensi() {
     loadOptions();
   }, []);
 
+  // Auto-select dari URL query parameter
+  useEffect(() => {
+    if (meetings.length === 0) return;
+    
+    const meetingIdFromUrl = searchParams.get("meeting");
+    if (meetingIdFromUrl) {
+      const meetingId = Number(meetingIdFromUrl);
+      const meeting = meetings.find(m => m.id === meetingId);
+      
+      if (meeting) {
+        // Set praktikum, kelas, dan pertemuan sesuai meeting yang dipilih
+        setSelectedCourse(String(meeting.course_id));
+        setSelectedClass(String(meeting.class_id));
+        setSelectedMeeting(String(meeting.id));
+        
+        // Langsung load rekap
+        loadRekap(meeting.id);
+      }
+    }
+  }, [meetings, searchParams]);
+
   // Filter meetings based on selected course and class
   const filteredMeetings = meetings.filter(m => {
     if (!selectedCourse || !selectedClass) return false;
@@ -44,31 +82,22 @@ export default function AdminRekapAbsensi() {
 
   // Reset kelas dan pertemuan saat praktikum berubah
   useEffect(() => {
-    setSelectedClass("");
-    setSelectedMeeting("");
-    setAttendances([]);
-  }, [selectedCourse]);
+    // Jangan reset jika ada query parameter meeting
+    if (!searchParams.get("meeting")) {
+      setSelectedClass("");
+      setSelectedMeeting("");
+      setAttendances([]);
+    }
+  }, [selectedCourse, searchParams]);
 
   // Reset pertemuan saat kelas berubah
   useEffect(() => {
-    setSelectedMeeting("");
-    setAttendances([]);
-  }, [selectedClass]);
-
-  // Load rekap attendance saat meeting dipilih
-  const loadRekap = async (meetingId) => {
-    if (!meetingId) return;
-    
-    setLoadingRekap(true);
-    try {
-      const res = await api.get(`/admin/meetings/${meetingId}/rekap`);
-      setAttendances(res.data || []);
-    } catch (e) {
-      console.error(e);
+    // Jangan reset jika ada query parameter meeting
+    if (!searchParams.get("meeting")) {
+      setSelectedMeeting("");
       setAttendances([]);
     }
-    setLoadingRekap(false);
-  };
+  }, [selectedClass, searchParams]);
 
   const handleTerapkan = () => {
     if (selectedMeeting) {
@@ -88,7 +117,7 @@ export default function AdminRekapAbsensi() {
       ...attendances.map(a => [
         a.member?.student_id || "-",
         a.member?.name || "-",
-        a.checked_in_at ? new Date(a.checked_in_at).toLocaleString("id-ID") : "-",
+        a.checked_in_at || "-",
         a.status || "Hadir"
       ])
     ].map(row => row.join(",")).join("\n");
@@ -102,28 +131,35 @@ export default function AdminRekapAbsensi() {
   };
 
   const getStatusBadge = (attendance) => {
-    if (!attendance.checked_in_at) {
+    // Gunakan status dari backend
+    const status = attendance.status || 'Hadir';
+    
+    if (status === 'Alpa') {
       return { text: "Alpa", bg: "bg-red-100", color: "text-red-700" };
+    } else if (status === 'Terlambat') {
+      return { text: "Terlambat", bg: "bg-yellow-100", color: "text-yellow-700" };
+    } else {
+      return { text: "Hadir", bg: "bg-green-100", color: "text-green-700" };
     }
-    
-    const meeting = meetings.find(m => m.id === Number(selectedMeeting));
-    if (meeting && meeting.start_time) {
-      const startTime = new Date(meeting.start_time);
-      const checkInTime = new Date(attendance.checked_in_at);
-      const diff = (checkInTime - startTime) / (1000 * 60);
-      
-      if (diff > 15) {
-        return { text: "Terlambat", bg: "bg-yellow-100", color: "text-yellow-700" };
-      }
-    }
-    
-    return { text: "Hadir", bg: "bg-green-100", color: "text-green-700" };
   };
 
   const selectedMeetingData = meetings.find(m => m.id === Number(selectedMeeting));
+  const isAutoFiltered = searchParams.get("meeting") && selectedMeetingData;
 
   return (
     <div className="space-y-6">
+      {/* Auto-filter notification */}
+      {isAutoFiltered && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-center gap-3">
+          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span className="text-blue-700 text-sm font-medium">
+            Rekap otomatis ditampilkan untuk: <strong>{selectedMeetingData?.name}</strong> - Pertemuan {selectedMeetingData?.meeting_number}
+          </span>
+        </div>
+      )}
+
       {/* Filter Section */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
@@ -264,14 +300,7 @@ export default function AdminRekapAbsensi() {
                         {attendance.member?.name || "-"}
                       </td>
                       <td className="py-4 px-4 text-base">
-                        {attendance.checked_in_at 
-                          ? new Date(attendance.checked_in_at).toLocaleString("id-ID", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              second: "2-digit",
-                              timeZone: "Asia/Jakarta"
-                            }) + " WIB"
-                          : "_"}
+                        {attendance.checked_in_at || "-"}
                       </td>
                       <td className="py-4 px-4">
                         <span className={`inline-block px-4 py-1 rounded ${status.bg} ${status.color} font-medium`}>
