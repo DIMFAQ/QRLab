@@ -12,7 +12,12 @@ class ProfileController extends Controller
     // GET /api/profile - Get user profile with photo
     public function show(Request $request)
     {
-        $user = $request->user()->load('member');
+        $user = $request->user();
+        
+        // Load member hanya jika belum di-load
+        if (!$user->relationLoaded('member')) {
+            $user->load('member');
+        }
         
         $photoUrl = null;
         if ($user->profile_photo) {
@@ -20,7 +25,7 @@ class ProfileController extends Controller
             $photoUrl = '/storage/' . $user->profile_photo;
         }
         
-        return response()->json([
+        $response = [
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
@@ -30,7 +35,11 @@ class ProfileController extends Controller
                 'student_id' => $user->member->student_id,
                 'name' => $user->member->name,
             ] : null,
-        ]);
+        ];
+        
+        // Add cache header to reduce duplicate requests (cache for 30 seconds)
+        return response()->json($response)
+            ->header('Cache-Control', 'private, max-age=30');
     }
 
     // POST /api/profile/photo - Upload profile photo

@@ -91,11 +91,13 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'Anda sudah absen di pertemuan ini.'], 200);
         }
 
-        // 4️⃣ Simpan data absensi
+        // 4️⃣ Simpan data absensi dengan waktu UTC
+        $checkedInAt = \Carbon\Carbon::now('Asia/Jakarta')->setTimezone('UTC');
+        
         \App\Models\Attendance::create([
             'member_id' => $member->id,
             'meeting_id' => $meetingId,
-            'checked_in_at' => now(),
+            'checked_in_at' => $checkedInAt,
         ]);
 
         return response()->json([

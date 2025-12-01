@@ -402,9 +402,13 @@ export default function PraktikanDashboard({ user }) {
       const res = await api.get('/profile');
       if (res.data.profile_photo) {
         setProfilePhoto(res.data.profile_photo);
+      } else {
+        setProfilePhoto(null);
       }
     } catch (error) {
       console.error('Failed to load profile photo:', error);
+      // Set null untuk menghindari retry terus-menerus
+      setProfilePhoto(null);
     }
   };
 

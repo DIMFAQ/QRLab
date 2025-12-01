@@ -171,21 +171,28 @@ class PraktikanController extends Controller
             $scannedAt = null;
             
             if ($attendance) {
-                $checkedAt = $attendance->created_at;
-                $meetingStart = $meeting->start_time;
+                // Hitung status berdasarkan waktu scan (checked_in_at)
+                $startTime = \Carbon\Carbon::parse($meeting->start_time);
+                $scanTime = \Carbon\Carbon::parse($attendance->checked_in_at);
                 
-                // Toleransi terlambat: 15 menit setelah start_time
-                $lateThreshold = $meetingStart->copy()->addMinutes(15);
+                // diffInMinutes dengan false: positif jika scan setelah start, negatif jika sebelum
+                $minutesAfterStart = $startTime->diffInMinutes($scanTime, false);
                 
-                if ($checkedAt <= $lateThreshold) {
-                    $status = 'Hadir';
+                // Status:
+                // - Scan sebelum start (negatif) atau 0-15 menit setelah = Hadir
+                // - Scan > 15 menit setelah start = Terlambat
+                if ($minutesAfterStart <= 0) {
+                    $status = 'Hadir'; // Scan sebelum/tepat waktu meeting dimulai
+                    $summary['hadir']++;
+                } elseif ($minutesAfterStart <= 15) {
+                    $status = 'Hadir'; // Toleransi 15 menit setelah start
                     $summary['hadir']++;
                 } else {
-                    $status = 'Terlambat';
+                    $status = 'Terlambat'; // Lebih dari 15 menit
                     $summary['terlambat']++;
                 }
                 
-                $scannedAt = $checkedAt->format('Y-m-d H:i:s');
+                $scannedAt = $scanTime->timezone('Asia/Jakarta')->format('Y-m-d H:i:s');
             } else {
                 $summary['alpa']++;
             }

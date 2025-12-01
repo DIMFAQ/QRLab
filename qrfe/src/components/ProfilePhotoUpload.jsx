@@ -5,12 +5,17 @@ const ProfilePhotoUpload = ({ onPhotoChange }) => {
   const [photoUrl, setPhotoUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadProfile();
   }, []);
 
   const loadProfile = async () => {
+    // Prevent duplicate requests
+    if (loading) return;
+    
+    setLoading(true);
     try {
       const res = await api.get('/profile');
       if (res.data.profile_photo) {
@@ -18,6 +23,8 @@ const ProfilePhotoUpload = ({ onPhotoChange }) => {
       }
     } catch (error) {
       console.error('Failed to load profile:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -25,15 +32,32 @@ const ProfilePhotoUpload = ({ onPhotoChange }) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validasi file type
-    if (!file.type.startsWith('image/')) {
-      alert('File harus berupa gambar!');
+    // Validasi file size (max 5MB sebelum konversi)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Ukuran file maksimal 5MB!');
       return;
     }
 
-    // Validasi file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      alert('Ukuran file maksimal 2MB!');
+    // Konversi HEIC/HEIF ke JPEG jika perlu
+    let processedFile = file;
+    const isHeic = file.type === 'image/heic' || file.type === 'image/heif' || 
+                   file.name.toLowerCase().endsWith('.heic') || 
+                   file.name.toLowerCase().endsWith('.heif');
+
+    if (isHeic) {
+      try {
+        alert('Mengkonversi HEIC ke JPEG...');
+        processedFile = await convertHeicToJpeg(file);
+      } catch (error) {
+        console.error('HEIC conversion error:', error);
+        alert('Gagal mengkonversi HEIC. Coba gunakan format JPG/PNG.');
+        return;
+      }
+    }
+
+    // Validasi file type setelah konversi
+    if (!processedFile.type.startsWith('image/')) {
+      alert('File harus berupa gambar!');
       return;
     }
 
@@ -42,12 +66,12 @@ const ProfilePhotoUpload = ({ onPhotoChange }) => {
     reader.onloadend = () => {
       setPreview(reader.result);
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(processedFile);
 
     // Upload
     setUploading(true);
     const formData = new FormData();
-    formData.append('photo', file);
+    formData.append('photo', processedFile);
 
     try {
       const res = await api.post('/profile/photo', formData, {
@@ -70,6 +94,58 @@ const ProfilePhotoUpload = ({ onPhotoChange }) => {
     } finally {
       setUploading(false);
     }
+  };
+
+  // Konversi HEIC ke JPEG menggunakan Canvas
+  const convertHeicToJpeg = async (heicFile) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.onload = () => {
+          // Resize jika terlalu besar (max 1920px)
+          let width = img.width;
+          let height = img.height;
+          const maxSize = 1920;
+          
+          if (width > maxSize || height > maxSize) {
+            if (width > height) {
+              height = (height / width) * maxSize;
+              width = maxSize;
+            } else {
+              width = (width / height) * maxSize;
+              height = maxSize;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convert to JPEG blob
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const jpegFile = new File([blob], heicFile.name.replace(/\.heic$/i, '.jpg'), {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              resolve(jpegFile);
+            } else {
+              reject(new Error('Failed to convert to JPEG'));
+            }
+          }, 'image/jpeg', 0.9);
+        };
+        
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = e.target.result;
+      };
+      
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(heicFile);
+    });
   };
 
   const handleDelete = async () => {

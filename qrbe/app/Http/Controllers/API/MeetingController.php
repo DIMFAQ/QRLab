@@ -268,9 +268,20 @@ class MeetingController extends Controller
                 // Hitung status berdasarkan waktu scan
                 $startTime = \Carbon\Carbon::parse($meeting->start_time);
                 $scanTime = \Carbon\Carbon::parse($att->checked_in_at);
-                $minutesLate = $startTime->diffInMinutes($scanTime, false);
                 
-                $status = $minutesLate <= 15 ? 'Hadir' : 'Terlambat';
+                // diffInMinutes dengan false: positif jika scan setelah start, negatif jika sebelum
+                $minutesAfterStart = $startTime->diffInMinutes($scanTime, false);
+                
+                // Status:
+                // - Scan sebelum start (negatif) atau 0-15 menit setelah = Hadir
+                // - Scan > 15 menit setelah start = Terlambat
+                if ($minutesAfterStart <= 0) {
+                    $status = 'Hadir'; // Scan sebelum/tepat waktu meeting dimulai
+                } elseif ($minutesAfterStart <= 15) {
+                    $status = 'Hadir'; // Toleransi 15 menit setelah start
+                } else {
+                    $status = 'Terlambat'; // Lebih dari 15 menit
+                }
                 
                 $rekap[] = [
                     'member' => [
@@ -380,9 +391,16 @@ class MeetingController extends Controller
                 // Hitung status berdasarkan waktu scan
                 $startTime = \Carbon\Carbon::parse($meeting->start_time);
                 $scanTime = \Carbon\Carbon::parse($att->checked_in_at);
-                $minutesLate = $startTime->diffInMinutes($scanTime, false);
                 
-                $status = $minutesLate <= 15 ? 'Hadir' : 'Terlambat';
+                $minutesAfterStart = $startTime->diffInMinutes($scanTime, false);
+                
+                if ($minutesAfterStart <= 0) {
+                    $status = 'Hadir';
+                } elseif ($minutesAfterStart <= 15) {
+                    $status = 'Hadir';
+                } else {
+                    $status = 'Terlambat';
+                }
                 
                 $rekap[] = [
                     'npm' => $npm,
