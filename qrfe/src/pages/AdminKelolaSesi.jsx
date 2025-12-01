@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { QRCodeCanvas as QRCode } from "qrcode.react";
 import api from "../api";
-import MeetingForm from "../components/MeetingForm";
+import MeetingForm from "./MeetingForm";
 
 // Helper function to convert UTC to Jakarta time
 const toJakartaTime = (utcDateString) => {

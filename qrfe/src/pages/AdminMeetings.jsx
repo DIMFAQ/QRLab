@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import MeetingForm from '../components/MeetingForm';
+import MeetingForm from './MeetingForm';
 import { QRCodeCanvas as QRCode } from 'qrcode.react';
 
 // Impor ikon placeholder (gantilah dengan ikon React jika ada)
