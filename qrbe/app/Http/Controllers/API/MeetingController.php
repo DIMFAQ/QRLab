@@ -151,7 +151,7 @@ class MeetingController extends Controller
 
         // Buat token BARU
         $token = $meeting->tokens()->create([
-            'token' => Str::random(40),
+            'token' => Str::random(20),
             'expires_at' => $expiry, //
         ]);
 
@@ -182,7 +182,7 @@ class MeetingController extends Controller
         $expiry = now()->addMinutes($duration);
 
         $token = $meeting->tokens()->create([
-            'token' => Str::random(40),
+            'token' => Str::random(20),
             'expires_at' => $expiry,
         ]);
 
@@ -465,7 +465,7 @@ class MeetingController extends Controller
                 $expiresAt = Carbon::now('Asia/Jakarta')->addMinutes($duration);
                 
                 $token = $meeting->tokens()->create([
-                    'token' => Str::random(40),
+                    'token' => Str::random(20),
                     'expires_at' => $expiresAt,
                 ]);
 
